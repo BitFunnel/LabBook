@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	cli.Process(os.Args)
+	cli.ParseAndDispatch(os.Args)
 }

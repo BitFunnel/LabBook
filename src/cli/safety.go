@@ -9,7 +9,7 @@ import (
 	"regexp"
 )
 
-func safetyCheck(experimentRoot string) error {
+func checkCurrentUserSafe() error {
 	// TODO: Extend to Windows.
 	user, userErr := user.Current()
 	if userErr != nil {
@@ -24,14 +24,18 @@ func safetyCheck(experimentRoot string) error {
 			"with the --allow-sudo flag")
 	}
 
-	unsafe, pathCheckErr := pathUnsafe(experimentRoot)
+	return nil
+}
+
+func checkDirectorySafe(path string) error {
+	unsafe, pathCheckErr := pathUnsafe(path)
 	if pathCheckErr != nil {
 		return pathCheckErr
 	} else if unsafe {
 		// TODO: Add --allow-unsafe-paths.
 		return fmt.Errorf("Refusing to write to path '%s' because it is a "+
 			"systems directory. To enable this, use the flag "+
-			"--allow-unsafe-paths", experimentRoot)
+			"--allow-unsafe-paths", path)
 	}
 
 	return nil

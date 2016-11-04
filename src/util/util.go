@@ -13,6 +13,13 @@ func Check(err error, msg string) {
 	}
 }
 
+// CheckErr will log `err` if an error is present, and then exit the process.
+func CheckErr(err error) {
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+}
+
 // Exists checks whether a path exists on the filesystem.
 func Exists(path string) bool {
 	if _, err := os.Stat(path); os.IsNotExist(err) {

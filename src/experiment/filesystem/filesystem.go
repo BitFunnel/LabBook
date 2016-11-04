@@ -82,6 +82,7 @@ func (m managerContext) writeScript(manifestPaths []string, script []string) err
 	return nil
 }
 
+// TODO: Make this an actual URL.
 func fetchFileLines(url string) ([]string, error) {
 	resp, getErr := http.Get(url)
 	if getErr != nil {

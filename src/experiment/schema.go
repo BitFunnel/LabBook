@@ -32,5 +32,6 @@ func DeserializeSchema(reader io.Reader) (Schema, error) {
 	}
 
 	// TODO: Validate schema.
+
 	return schema, nil
 }

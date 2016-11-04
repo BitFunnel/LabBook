@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bitfunnel/bf-lab-notebook/src/experiment"
-	"github.com/bitfunnel/bf-lab-notebook/src/util"
+	"github.com/bitfunnel/LabBook/src/experiment"
+	"github.com/bitfunnel/LabBook/src/util"
 )
 
 const usage = `

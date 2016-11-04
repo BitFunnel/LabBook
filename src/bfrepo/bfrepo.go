@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bitfunnel/bf-lab-notebook/src/cmd"
+	"github.com/bitfunnel/LabBook/src/cmd"
 )
 
 const bitfunnelHTTPSRemote = `https://github.com/bitfunnel/bitfunnel`

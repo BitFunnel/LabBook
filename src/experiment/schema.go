@@ -4,7 +4,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/bitfunnel/bf-lab-notebook/src/corpus"
+	"github.com/bitfunnel/LabBook/src/corpus"
 	"github.com/go-yaml/yaml"
 )
 

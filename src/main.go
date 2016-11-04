@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/bitfunnel/bf-lab-notebook/src/cli"
+	"github.com/bitfunnel/LabBook/src/cli"
 )
 
 func main() {

@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bitfunnel/bf-lab-notebook/src/cmd"
-	"github.com/bitfunnel/bf-lab-notebook/src/util"
+	"github.com/bitfunnel/LabBook/src/cmd"
+	"github.com/bitfunnel/LabBook/src/util"
 )
 
 // Manager is responsible for the lifecycle of the corpus, including

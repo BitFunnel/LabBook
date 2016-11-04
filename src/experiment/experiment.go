@@ -6,10 +6,10 @@ import (
 
 	"errors"
 
-	"github.com/bitfunnel/bf-lab-notebook/src/bfrepo"
-	"github.com/bitfunnel/bf-lab-notebook/src/corpus"
-	"github.com/bitfunnel/bf-lab-notebook/src/experiment/filesystem"
-	"github.com/bitfunnel/bf-lab-notebook/src/util"
+	"github.com/bitfunnel/LabBook/src/bfrepo"
+	"github.com/bitfunnel/LabBook/src/corpus"
+	"github.com/bitfunnel/LabBook/src/experiment/filesystem"
+	"github.com/bitfunnel/LabBook/src/util"
 )
 
 // Experiment manages the lifecycle of the experiment, including a build of

@@ -10,7 +10,7 @@ import (
 const bitfunnelHTTPSRemote = `https://github.com/bitfunnel/bitfunnel`
 const bitfunnelSSHRemote = `git@github.com:BitFunnel/BitFunnel.git`
 
-// BfRepo manages the lifecycle of a BitFunnel repository, everything from
+// Manager manages the lifecycle of a BitFunnel repository, everything from
 // cloning, to checking out a specific version, to building BitFunnel, to
 // runinng the REPL.
 type Manager interface {
@@ -30,7 +30,7 @@ type bfRepoContext struct {
 	bitFunnelExecutable string
 }
 
-// MakeBfRepo creates a BfRepo object, to manage a BitFunnel repository.
+// New creates a BfRepo object, to manage a BitFunnel repository.
 func New(bitFunnelRoot string) Manager {
 	buildRoot := fmt.Sprintf("%s/build-make", bitFunnelRoot)
 	bitFunnelExecutable :=

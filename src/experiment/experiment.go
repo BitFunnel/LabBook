@@ -53,7 +53,7 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 		return deserializeError
 	}
 
-	bfError := buildBitFunnelAtRevision(expt.codeRepo, schema.BfSha)
+	bfError := buildBitFunnelAtRevision(expt.codeRepo, schema.BitFunnelSha)
 	if bfError != nil {
 		return bfError
 	}

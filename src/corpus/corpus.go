@@ -25,25 +25,6 @@ type Chunk struct {
 	SHA512 string `yaml:"sha512"`
 }
 
-func (chunk Chunk) validate(reader io.Reader) bool {
-	stream, readErr := ioutil.ReadAll(reader)
-	if readErr != nil {
-		return false
-	}
-
-	hash := sha512.New()
-	hash.Write(stream)
-	actualSha512Hash := fmt.Sprintf("%x", hash.Sum(nil))
-
-	return strings.ToLower(actualSha512Hash) ==
-		strings.ToLower(chunk.SHA512)
-}
-
-type corpusContext struct {
-	chunks     []Chunk
-	corpusRoot string
-}
-
 // New makes a `Manager`, which can be used to govern the lifecycle of a
 // corpus directory.
 func New(chunks []Chunk, corpusRoot string) Manager {
@@ -83,4 +64,23 @@ func (ctx corpusContext) Uncompress() error {
 	}
 
 	return nil
+}
+
+func (chunk Chunk) validate(reader io.Reader) bool {
+	stream, readErr := ioutil.ReadAll(reader)
+	if readErr != nil {
+		return false
+	}
+
+	hash := sha512.New()
+	hash.Write(stream)
+	actualSha512Hash := fmt.Sprintf("%x", hash.Sum(nil))
+
+	return strings.ToLower(actualSha512Hash) ==
+		strings.ToLower(chunk.SHA512)
+}
+
+type corpusContext struct {
+	chunks     []Chunk
+	corpusRoot string
 }

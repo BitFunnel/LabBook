@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bitfunnel/LabBook/src/cmd"
@@ -38,7 +39,7 @@ func (ctx corpusContext) Uncompress() error {
 				chunk.Name)
 		}
 
-		chunkPath := fmt.Sprintf("%s/%s", ctx.corpusRoot, chunk.Name)
+		chunkPath := filepath.Join(ctx.corpusRoot, chunk.Name)
 
 		if !util.Exists(chunkPath) {
 			return fmt.Errorf("Corpus file '%s' does not exist.", chunkPath)

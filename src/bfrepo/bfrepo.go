@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"path/filepath"
+
 	"github.com/bitfunnel/LabBook/src/cmd"
 )
 
@@ -32,9 +34,9 @@ type bfRepoContext struct {
 
 // New creates a BfRepo object, to manage a BitFunnel repository.
 func New(bitFunnelRoot string) Manager {
-	buildRoot := fmt.Sprintf("%s/build-make", bitFunnelRoot)
+	buildRoot := filepath.Join(bitFunnelRoot, "build-make")
 	bitFunnelExecutable :=
-		fmt.Sprintf("%s/tools/BitFunnel/src/BitFunnel", buildRoot)
+		filepath.Join(buildRoot, "tools", "BitFunnel", "src", "BitFunnel")
 	return bfRepoContext{
 		bitFunnelRoot:       bitFunnelRoot,
 		buildRoot:           buildRoot,

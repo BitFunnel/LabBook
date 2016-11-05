@@ -1,8 +1,8 @@
 package experiment
 
 import (
-	"fmt"
 	"io"
+	"path/filepath"
 
 	"errors"
 
@@ -37,7 +37,7 @@ type configContext struct {
 // New creates an Experiment object, which manages the lifecycle and
 // resources of an experiment.
 func New(experimentRoot string, bitFunnelRoot string, corpusRoot string) Experiment {
-	configRoot := fmt.Sprintf("%s/configuration", experimentRoot)
+	configRoot := filepath.Join(experimentRoot, "configuration")
 	bf := bfrepo.New(bitFunnelRoot)
 	return &experimentContext{
 		experimentRoot: experimentRoot,

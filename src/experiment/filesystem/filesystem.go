@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ type Manager interface {
 
 // New creates a new Manager object.
 func New(configRoot string, corpusRoot string, manifestURL string, scriptURL string) Manager {
-	scriptPath := fmt.Sprintf("%s/script.txt", configRoot)
+	scriptPath := filepath.Join(configRoot, "script.txt")
 	return managerContext{
 		configRoot:  configRoot,
 		corpusRoot:  corpusRoot,

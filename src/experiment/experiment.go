@@ -48,6 +48,10 @@ func New(experimentRoot string, bitFunnelRoot string, corpusRoot string) Experim
 }
 
 func (expt *experimentContext) Configure(reader io.Reader) error {
+	if expt.configured == true {
+		return errors.New("Experiments can't be configured twice")
+	}
+
 	schema, deserializeError := DeserializeSchema(reader)
 	if deserializeError != nil {
 		return deserializeError

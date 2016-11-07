@@ -162,12 +162,27 @@ func (repo bfRepoContext) Build() error {
 
 // Repl runs the BitFunnel repl.
 func (repo bfRepoContext) ConfigureRuntime(manifestFile string, configDir string) error {
-	return cmd.RunCommand(
+	// TODO: Filter corpus here also.
+
+	statisticsErr := cmd.RunCommand(
 		repo.bitFunnelExecutable,
 		"statistics",
 		manifestFile,
 		configDir,
 		"-text")
+	if statisticsErr != nil {
+		return statisticsErr
+	}
+
+	termTableErr := cmd.RunCommand(
+		repo.bitFunnelExecutable,
+		"termtable",
+		configDir)
+	if termTableErr != nil {
+		return termTableErr
+	}
+
+	return nil
 }
 
 // Repl runs the BitFunnel repl.

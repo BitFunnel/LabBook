@@ -6,9 +6,11 @@ import (
 
 	"errors"
 
+	"fmt"
+
 	"github.com/bitfunnel/LabBook/src/bfrepo"
 	"github.com/bitfunnel/LabBook/src/corpus"
-	"github.com/bitfunnel/LabBook/src/experiment/filesystem"
+	"github.com/bitfunnel/LabBook/src/experiment/file"
 	"github.com/bitfunnel/LabBook/src/util"
 )
 
@@ -29,9 +31,9 @@ type experimentContext struct {
 }
 
 type configContext struct {
-	schema      Schema
-	corpus      corpus.Manager
-	fileManager filesystem.Manager
+	schema        Schema
+	corpusManager corpus.Manager
+	fileManager   file.Manager
 }
 
 // New creates an Experiment object, which manages the lifecycle and
@@ -52,42 +54,59 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 		return errors.New("Experiments can't be configured twice")
 	}
 
+	// Get YAML experiment schema describing our experiment.
 	schema, deserializeError := DeserializeSchema(reader)
 	if deserializeError != nil {
 		return deserializeError
 	}
 
+	// Check out BitFunnel at a particular commit and build.
 	bfError := buildBitFunnelAtRevision(expt.codeRepo, schema.BitFunnelSha)
 	if bfError != nil {
 		return bfError
 	}
 
-	corpus := corpus.New(schema.Corpus, expt.corpusRoot)
-	uncompressErr := corpus.Uncompress()
+	// Uncompress corpus, find filepaths of all corpus files.
+	corpusManager := corpus.NewManager(schema.Corpus, expt.corpusRoot)
+	uncompressErr := corpusManager.Uncompress()
 	if uncompressErr != nil {
 		return uncompressErr
 	}
+	corpusPaths, walkErr := corpusManager.GetAllCorpusFilepaths()
+	if walkErr != nil {
+		return fmt.Errorf("Failed to fetch filepaths of corpus rooted at "+
+			"'%s':\n%v", expt.corpusRoot, walkErr)
+	}
 
-	filesystem := filesystem.New(
+	// Write the configuration manifest we'll pass to `termtable` and
+	// `statistics`. Fetch query log and write the experiment script.
+	fileManager := file.NewManager(
 		expt.configRoot,
 		expt.corpusRoot,
-		schema.ManifestFile,
-		schema.ScriptFile)
-	fetchErr := filesystem.FetchAndWriteMetadata()
+		expt.experimentRoot)
+	configManifestWriteErr := fileManager.WriteConfigManifestFile(corpusPaths)
+	if configManifestWriteErr != nil {
+		return configManifestWriteErr
+	}
+	fetchErr := fileManager.FetchMetadataAndWriteScript(
+		schema.QueryLog.URL,
+		schema.QueryLog.SHA512)
 	if fetchErr != nil {
 		return fetchErr
 	}
 
-	// replError := expt.codeRepo.ConfigureRuntime(
-	// 	"/Users/alex/src/BitFunnel/wikidata/enwiki-20161020-config")
-	// if replError != nil {
-	// 	return replError
-	// }
+	// Build statistics and term table.
+	replError := expt.codeRepo.ConfigureRuntime(
+		fileManager.ConfigManifestPath(),
+		expt.configRoot)
+	if replError != nil {
+		return replError
+	}
 
 	expt.config = configContext{
-		schema:      schema,
-		corpus:      corpus,
-		fileManager: filesystem,
+		schema:        schema,
+		corpusManager: corpusManager,
+		fileManager:   fileManager,
 	}
 	expt.configured = true
 
@@ -101,11 +120,11 @@ func (expt *experimentContext) Run() error {
 		return errors.New("Can't run experiment without calling `Configure`")
 	}
 
-	replError := expt.codeRepo.Repl(
-		"/Users/alex/src/BitFunnel/wikidata/enwiki-20161020-config",
+	verifyScriptErr := expt.codeRepo.Repl(
+		expt.configRoot,
 		expt.config.fileManager.ScriptPath())
-	if replError != nil {
-		return replError
+	if verifyScriptErr != nil {
+		return verifyScriptErr
 	}
 
 	return nil

@@ -13,16 +13,18 @@ import (
 // Schema is the concrete type that represents an experiment schema
 // that is declared in a YAML file.
 type Schema struct {
-	BitFunnelSha   string `yaml:"bitfunnel-commit-hash"`
-	LabBookVersion string `yaml:"lab-book-version"`
-	QueryLog       struct {
-		RawURL string `yaml:"raw-url"`
-		URL    *url.URL
-		SHA512 string `yaml:"sha512"`
-	} `yaml:"query-log"`
-	ManifestFile string         `yaml:"manifest-file"`
-	ScriptFile   string         `yaml:"script-file"`
-	Corpus       []corpus.Chunk `yaml:"corpus"`
+	BitFunnelSha   string          `yaml:"bitfunnel-commit-hash"`
+	LabBookVersion string          `yaml:"lab-book-version"`
+	QueryLog       *QueryLog       `yaml:"query-log"`
+	ManifestFile   string          `yaml:"manifest-file"`
+	ScriptFile     string          `yaml:"script-file"`
+	Corpus         []*corpus.Chunk `yaml:"corpus"`
+}
+
+type QueryLog struct {
+	RawURL string `yaml:"raw-url"`
+	URL    *url.URL
+	SHA512 string `yaml:"sha512"`
 }
 
 // DeserializeSchema deserializes an `Schema` from an `io.Reader`.

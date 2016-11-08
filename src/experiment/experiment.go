@@ -8,10 +8,10 @@ import (
 
 	"fmt"
 
-	"github.com/bitfunnel/LabBook/src/bfrepo"
-	"github.com/bitfunnel/LabBook/src/corpus"
-	"github.com/bitfunnel/LabBook/src/experiment/file"
-	"github.com/bitfunnel/LabBook/src/util"
+	"github.com/BitFunnel/LabBook/src/bfrepo"
+	"github.com/BitFunnel/LabBook/src/corpus"
+	"github.com/BitFunnel/LabBook/src/experiment/file"
+	"github.com/BitFunnel/LabBook/src/util"
 )
 
 // Experiment manages the lifecycle of the experiment, including a build of

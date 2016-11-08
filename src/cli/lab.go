@@ -3,8 +3,8 @@ package cli
 import (
 	"flag"
 
-	"github.com/bitfunnel/LabBook/src/cli/errors"
-	"github.com/bitfunnel/LabBook/src/systems"
+	"github.com/BitFunnel/LabBook/src/cli/errors"
+	"github.com/BitFunnel/LabBook/src/systems"
 )
 
 const labUsage = `Usage:

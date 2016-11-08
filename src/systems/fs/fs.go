@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/bitfunnel/LabBook/src/systems"
+	"github.com/BitFunnel/LabBook/src/systems"
 )
 
 type fsOperation struct {

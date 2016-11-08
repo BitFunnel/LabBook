@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bitfunnel/LabBook/src/systems/shell"
-	"github.com/bitfunnel/LabBook/src/util"
+	"github.com/BitFunnel/LabBook/src/systems/shell"
+	"github.com/BitFunnel/LabBook/src/util"
 )
 
 // Manager is responsible for the lifecycle of the corpus, including

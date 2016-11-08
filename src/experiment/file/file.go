@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bitfunnel/LabBook/src/systems/fs"
-	"github.com/bitfunnel/LabBook/src/util"
+	"github.com/BitFunnel/LabBook/src/systems/fs"
+	"github.com/BitFunnel/LabBook/src/util"
 )
 
 // Manager manages the lifecycle of the experiment files. This includes

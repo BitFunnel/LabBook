@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/bitfunnel/LabBook/src/cli"
+	"github.com/BitFunnel/LabBook/src/cli"
 )
 
 func main() {

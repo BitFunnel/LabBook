@@ -6,11 +6,11 @@ import (
 
 	"path/filepath"
 
-	"github.com/bitfunnel/LabBook/src/systems/fs"
-	"github.com/bitfunnel/LabBook/src/systems/shell"
+	"github.com/BitFunnel/LabBook/src/systems/fs"
+	"github.com/BitFunnel/LabBook/src/systems/shell"
 )
 
-const bitfunnelHTTPSRemote = `https://github.com/bitfunnel/bitfunnel`
+const bitfunnelHTTPSRemote = `https://github.com/BitFunnel/bitfunnel`
 const bitfunnelSSHRemote = `git@github.com:BitFunnel/BitFunnel.git`
 
 // Manager manages the lifecycle of a BitFunnel repository, everything from

@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/bitfunnel/LabBook/src/corpus"
+	"github.com/BitFunnel/LabBook/src/corpus"
 	"github.com/go-yaml/yaml"
 )
 

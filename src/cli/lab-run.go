@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bitfunnel/LabBook/src/cli/errors"
-	"github.com/bitfunnel/LabBook/src/experiment"
+	"github.com/BitFunnel/LabBook/src/cli/errors"
+	"github.com/BitFunnel/LabBook/src/experiment"
 )
 
 const labRunUsage = `Usage:

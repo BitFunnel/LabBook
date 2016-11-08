@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/bitfunnel/LabBook/src/systems"
+	"github.com/BitFunnel/LabBook/src/systems"
 )
 
 type shellOperation struct {

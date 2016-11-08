@@ -11,6 +11,7 @@ import (
 	"github.com/BitFunnel/LabBook/src/bfrepo"
 	"github.com/BitFunnel/LabBook/src/corpus"
 	"github.com/BitFunnel/LabBook/src/experiment/file"
+	"github.com/BitFunnel/LabBook/src/schema"
 	"github.com/BitFunnel/LabBook/src/util"
 )
 
@@ -31,7 +32,7 @@ type experimentContext struct {
 }
 
 type configContext struct {
-	schema        Schema
+	schema        schema.Experiment
 	corpusManager corpus.Manager
 	fileManager   file.Manager
 }
@@ -55,7 +56,7 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 	}
 
 	// Get YAML experiment schema describing our experiment.
-	schema, deserializeError := DeserializeSchema(reader)
+	schema, deserializeError := schema.DeserializeExperimentSchema(reader)
 	if deserializeError != nil {
 		return deserializeError
 	}

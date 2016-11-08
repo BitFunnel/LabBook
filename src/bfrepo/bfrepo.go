@@ -6,12 +6,15 @@ import (
 
 	"path/filepath"
 
+	"strings"
+
 	"github.com/BitFunnel/LabBook/src/systems/fs"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
 )
 
-const bitfunnelHTTPSRemote = `https://github.com/BitFunnel/bitfunnel`
-const bitfunnelSSHRemote = `git@github.com:BitFunnel/BitFunnel.git`
+// NOTE: Git remotes are case-insensitive, which is why they're lowercase here.
+const bitfunnelHTTPSRemote = `https://github.com/bitfunnel/bitfunnel`
+const bitfunnelSSHRemote = `git@github.com:bitfunnel/bitfunnel.git`
 
 // Manager manages the lifecycle of a BitFunnel repository, everything from
 // cloning, to checking out a specific version, to building BitFunnel, to
@@ -71,7 +74,10 @@ func (repo bfRepoContext) Fetch() error {
 		return originURLErr
 	}
 
-	if originURL != bitfunnelSSHRemote && originURL != bitfunnelHTTPSRemote {
+	lowerOriginURL := strings.ToLower(originURL)
+
+	if lowerOriginURL != bitfunnelSSHRemote &&
+		lowerOriginURL != bitfunnelHTTPSRemote {
 		return fmt.Errorf("The remote 'origin' in the repository located at "+
 			"%s' is required to point at the canonical BitFunnel repository.",
 			repo.bitFunnelRoot)

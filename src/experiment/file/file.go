@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bitfunnel/LabBook/src/systems/fs"
 	"github.com/bitfunnel/LabBook/src/util"
 )
 
@@ -51,7 +52,7 @@ type managerContext struct {
 // writes them to the manifest file.
 func (m managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) error {
 	fileBytes := []byte(strings.Join(absoluteCorpusPaths, "\n"))
-	writeErr := ioutil.WriteFile(m.configManifestPath, fileBytes, 0666)
+	writeErr := fs.WriteFile(m.configManifestPath, fileBytes, 0666)
 	if writeErr != nil {
 		return fmt.Errorf("Failed to write configuration manifest file at "+
 			"'%s':\n%v", m.configManifestPath, writeErr)
@@ -92,22 +93,22 @@ func (m managerContext) ConfigManifestPath() string {
 }
 
 func (m managerContext) writeScript(manifestPaths []string, queryLog []string) error {
-	mkdirErr := os.MkdirAll(m.configRoot, 0777)
+	mkdirErr := fs.MkdirAll(m.configRoot, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
-	mkdirErr = os.MkdirAll(m.verifyOutPath, 0777)
+	mkdirErr = fs.MkdirAll(m.verifyOutPath, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
-	mkdirErr = os.MkdirAll(m.noVerifyOutPath, 0777)
+	mkdirErr = fs.MkdirAll(m.noVerifyOutPath, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
 
 	// TODO: Check to see if this will overwrite, rather than append, if it
 	// already exists.
-	w, createErr := os.Create(m.scriptPath)
+	w, createErr := fs.Create(m.scriptPath)
 	if createErr != nil {
 		return createErr
 	}

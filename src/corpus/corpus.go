@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bitfunnel/LabBook/src/cmd"
+	"github.com/bitfunnel/LabBook/src/systems/shell"
 	"github.com/bitfunnel/LabBook/src/util"
 )
 
@@ -60,7 +60,7 @@ func (ctx *corpusContext) Uncompress() error {
 
 		// TODO: Probably we can avoid un-taring this all the time, and also
 		// use a pure solution.
-		tarErr := cmd.RunCommand("tar", "-xf", chunkPath, "-C", ctx.corpusRoot)
+		tarErr := shell.RunCommand("tar", "-xf", chunkPath, "-C", ctx.corpusRoot)
 		if tarErr != nil {
 			return tarErr
 		}

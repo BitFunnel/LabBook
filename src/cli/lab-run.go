@@ -14,7 +14,7 @@ const labRunUsage = `Usage:
 
 func labRun(arguments []string) {
 	// Validate arguments.
-	if len(arguments) != 5 {
+	if len(arguments) < 5 {
 		errors.Logger.Fatalf("Invalid number of arguments.\n%s", labRunUsage)
 	}
 

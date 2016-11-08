@@ -6,7 +6,8 @@ import (
 
 	"path/filepath"
 
-	"github.com/bitfunnel/LabBook/src/cmd"
+	"github.com/bitfunnel/LabBook/src/systems/fs"
+	"github.com/bitfunnel/LabBook/src/systems/shell"
 )
 
 const bitfunnelHTTPSRemote = `https://github.com/bitfunnel/bitfunnel`
@@ -19,7 +20,7 @@ type Manager interface {
 	Path() string
 	Clone() error
 	Fetch() error
-	Checkout(revision string) (cmd.CmdHandle, error)
+	Checkout(revision string) (shell.CmdHandle, error)
 	ConfigureBuild() error
 	Build() error
 	ConfigureRuntime(manifestFile string, configDir string) error
@@ -52,7 +53,7 @@ func (repo bfRepoContext) Path() string {
 // `bitFunnelRoot`.
 func (repo bfRepoContext) Clone() (cloneErr error) {
 	cloneErr =
-		cmd.RunCommand("git", "clone", bitfunnelHTTPSRemote, repo.bitFunnelRoot)
+		shell.RunCommand("git", "clone", bitfunnelHTTPSRemote, repo.bitFunnelRoot)
 	return
 }
 
@@ -65,7 +66,7 @@ func (repo bfRepoContext) Fetch() error {
 	defer chdirHandle.Dispose()
 
 	originURL, originURLErr :=
-		cmd.CommandOutput("git", "config", "--get", "remote.origin.url")
+		shell.CommandOutput("git", "config", "--get", "remote.origin.url")
 	if originURLErr != nil {
 		return originURLErr
 	}
@@ -76,7 +77,7 @@ func (repo bfRepoContext) Fetch() error {
 			repo.bitFunnelRoot)
 	}
 
-	pullErr := cmd.RunCommand("git", "fetch", "origin")
+	pullErr := shell.RunCommand("git", "fetch", "origin")
 	if pullErr != nil {
 		return pullErr
 	}
@@ -86,7 +87,7 @@ func (repo bfRepoContext) Fetch() error {
 // Checkout take a path to a canonical BitFunnel repository,
 // `bitFunnelRoot`, and checks out a commit from the canonical GitHub
 // repository, specified by `sha`.
-func (repo bfRepoContext) Checkout(sha string) (cmd.CmdHandle, error) {
+func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 	chdirHandle, chdirErr := scopedChdir(repo.bitFunnelRoot)
 	if chdirErr != nil {
 		return nil, chdirErr
@@ -96,19 +97,19 @@ func (repo bfRepoContext) Checkout(sha string) (cmd.CmdHandle, error) {
 	// Returns the "short name" of HEAD. Usually this is a branch, like
 	// `master`, but if HEAD is detached, it can also simply be `HEAD`.
 	headRef, headRefErr :=
-		cmd.CommandOutput("git", "rev-parse", "--abbrev-ref=strict", "HEAD")
+		shell.CommandOutput("git", "rev-parse", "--abbrev-ref=strict", "HEAD")
 	if headRefErr != nil {
 		return nil, headRefErr
 	}
 
 	// The commit hash for HEAD.
-	headSha, headShaErr := cmd.CommandOutput("git", "rev-parse", "HEAD")
+	headSha, headShaErr := shell.CommandOutput("git", "rev-parse", "HEAD")
 	if headShaErr != nil {
 		return nil, headShaErr
 	}
 
 	// Checkout commit denoted with `sha`.
-	checkoutErr := cmd.RunCommand("git", "checkout", sha)
+	checkoutErr := shell.RunCommand("git", "checkout", sha)
 	if checkoutErr != nil {
 		return nil, checkoutErr
 	}
@@ -128,11 +129,11 @@ func (repo bfRepoContext) Checkout(sha string) (cmd.CmdHandle, error) {
 			presentRef = headRef
 		}
 
-		checkoutErr := cmd.RunCommand("git", "checkout", presentRef)
+		checkoutErr := shell.RunCommand("git", "checkout", presentRef)
 		return checkoutErr
 	}
 
-	return cmd.MakeHandle(resetHead), nil
+	return shell.MakeHandle(resetHead), nil
 }
 
 // Configure switches to the directory of the BitFunnel root, and runs
@@ -144,7 +145,7 @@ func (repo bfRepoContext) ConfigureBuild() error {
 	}
 	defer chdirHandle.Dispose()
 
-	configErr := cmd.RunCommand("sh", "Configure_Make.sh")
+	configErr := shell.RunCommand("sh", "Configure_Make.sh")
 	return configErr
 }
 
@@ -156,7 +157,7 @@ func (repo bfRepoContext) Build() error {
 	}
 	defer chdirHandle.Dispose()
 
-	buildErr := cmd.RunCommand("make", "-j4")
+	buildErr := shell.RunCommand("make", "-j4")
 	return buildErr
 }
 
@@ -164,7 +165,7 @@ func (repo bfRepoContext) Build() error {
 func (repo bfRepoContext) ConfigureRuntime(manifestFile string, configDir string) error {
 	// TODO: Filter corpus here also.
 
-	statisticsErr := cmd.RunCommand(
+	statisticsErr := shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"statistics",
 		manifestFile,
@@ -174,7 +175,7 @@ func (repo bfRepoContext) ConfigureRuntime(manifestFile string, configDir string
 		return statisticsErr
 	}
 
-	termTableErr := cmd.RunCommand(
+	termTableErr := shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"termtable",
 		configDir)
@@ -187,7 +188,7 @@ func (repo bfRepoContext) ConfigureRuntime(manifestFile string, configDir string
 
 // Repl runs the BitFunnel repl.
 func (repo bfRepoContext) Repl(configDir string, scriptFile string) error {
-	return cmd.RunCommand(
+	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"repl",
 		configDir,
@@ -197,16 +198,16 @@ func (repo bfRepoContext) Repl(configDir string, scriptFile string) error {
 
 // scopedChdir changes to `directory` and then, when `Dispose` is
 // called, it changes back to the current working directory.
-func scopedChdir(directory string) (cmd.CmdHandle, error) {
+func scopedChdir(directory string) (shell.CmdHandle, error) {
 	pwd, pwdErr := os.Getwd()
 	if pwdErr != nil {
 		return nil, pwdErr
 	}
 
-	chdirErr := os.Chdir(directory)
+	chdirErr := fs.Chdir(directory)
 	if chdirErr != nil {
 		return nil, chdirErr
 	}
 
-	return cmd.MakeHandle(func() error { return os.Chdir(pwd) }), nil
+	return shell.MakeHandle(func() error { return fs.Chdir(pwd) }), nil
 }

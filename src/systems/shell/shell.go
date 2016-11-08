@@ -1,10 +1,26 @@
-package cmd
+package shell
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/bitfunnel/LabBook/src/systems"
 )
+
+type shellOperation struct {
+	command string
+	args    []string
+}
+
+func (shellOp shellOperation) String() string {
+	return fmt.Sprintf("[SHELL] %s %s", shellOp.command, strings.Join(shellOp.args, " "))
+}
+
+func newShellOperation(command string, args []string) systems.Operation {
+	return shellOperation{command: command, args: args}
+}
 
 // CmdHandle allows automatic cleanup after complex commands. For example,
 // if we want to `chdir` to one directory, and then at the end of scope,
@@ -18,6 +34,13 @@ type CmdHandle interface {
 // RunCommand synchronously executes a command and pipes the output to stderr
 // and stdout.
 func RunCommand(command string, args ...string) error {
+	if systems.IsDryRun() {
+		operation := newShellOperation(command, args)
+		systems.OpLog().Log(&operation)
+
+		return nil
+	}
+
 	cmd := exec.Command(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

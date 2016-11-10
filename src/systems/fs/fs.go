@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/BitFunnel/LabBook/src/systems"
+	"github.com/BitFunnel/LabBook/src/systems/shell"
 )
 
 type fsOperation struct {
@@ -20,18 +21,33 @@ func newFsOperation(fsOp string) systems.Operation {
 	return fsOperation{opString: fsOp}
 }
 
-// Chdir is a mockable wrapper for `os.Chdir`.
-func Chdir(dir string) error {
+// Open is a mockable wrapper for `os.Open`.
+func Open(name string) (*os.File, error) {
 	if systems.IsDryRun() {
-		// NOTE: This is not a potentially deleterious operaiton, so we don't
-		// return early.
-		operationText := fmt.Sprintf(`os.Chdir("%s")`, dir)
+		operationText := fmt.Sprintf(`os.Open("%s")`, name)
 		operation := newFsOperation(operationText)
 		systems.OpLog().Log(&operation)
+
+		return os.Open(os.DevNull)
 	}
 
-	return os.Chdir(dir)
+	return os.Open(name)
+}
 
+// ScopedChdir changes to `directory` and then, when `Dispose` is
+// called, it changes back to the current working directory.
+func ScopedChdir(directory string) (shell.CmdHandle, error) {
+	pwd, pwdErr := os.Getwd()
+	if pwdErr != nil {
+		return nil, pwdErr
+	}
+
+	chdirErr := chdir(directory)
+	if chdirErr != nil {
+		return nil, chdirErr
+	}
+
+	return shell.MakeHandle(func() error { return chdir(pwd) }), nil
 }
 
 // MkdirAll is a mockable wrapper for `os.MkdirAll`.
@@ -71,4 +87,17 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error {
 	}
 
 	return ioutil.WriteFile(filename, data, perm)
+}
+
+// chdir is a mockable wrapper for `os.Chdir`.
+func chdir(dir string) error {
+	if systems.IsDryRun() {
+		// NOTE: This is not a potentially deleterious operaiton, so we don't
+		// return early.
+		operationText := fmt.Sprintf(`os.Chdir("%s")`, dir)
+		operation := newFsOperation(operationText)
+		systems.OpLog().Log(&operation)
+	}
+
+	return os.Chdir(dir)
 }

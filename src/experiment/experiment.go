@@ -2,7 +2,6 @@ package experiment
 
 import (
 	"io"
-	"path/filepath"
 
 	"errors"
 
@@ -24,7 +23,6 @@ type Experiment interface {
 
 type experimentContext struct {
 	experimentRoot string
-	configRoot     string
 	corpusRoot     string
 	codeRepo       bfrepo.Manager
 	configured     bool
@@ -40,11 +38,9 @@ type configContext struct {
 // New creates an Experiment object, which manages the lifecycle and
 // resources of an experiment.
 func New(experimentRoot string, bitFunnelRoot string, corpusRoot string) Experiment {
-	configRoot := filepath.Join(experimentRoot, "configuration")
 	bf := bfrepo.New(bitFunnelRoot)
 	return &experimentContext{
 		experimentRoot: experimentRoot,
-		configRoot:     configRoot,
 		corpusRoot:     corpusRoot,
 		codeRepo:       bf,
 	}
@@ -82,26 +78,30 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 	// Write the configuration manifest we'll pass to `termtable` and
 	// `statistics`. Fetch query log and write the experiment script.
 	fileManager := file.NewManager(
-		expt.configRoot,
 		expt.corpusRoot,
-		expt.experimentRoot)
+		expt.experimentRoot,
+		sampleNames(schema.Samples))
 	configManifestWriteErr := fileManager.WriteConfigManifestFile(corpusPaths)
 	if configManifestWriteErr != nil {
 		return configManifestWriteErr
 	}
+
+	// Build statistics and term table.
+	replError := configureBitFunnelRuntime(
+		expt.codeRepo,
+		fileManager,
+		&schema)
+	if replError != nil {
+		return replError
+	}
+
+	// Write experiment script.
 	fetchErr := fileManager.FetchMetadataAndWriteScript(
+		schema.RuntimeConfig.SampleName,
 		schema.QueryLog.URL,
 		schema.QueryLog.SHA512)
 	if fetchErr != nil {
 		return fetchErr
-	}
-
-	// Build statistics and term table.
-	replError := expt.codeRepo.ConfigureRuntime(
-		fileManager.ConfigManifestPath(),
-		expt.configRoot)
-	if replError != nil {
-		return replError
 	}
 
 	expt.config = configContext{
@@ -121,11 +121,57 @@ func (expt *experimentContext) Run() error {
 		return errors.New("Can't run experiment without calling `Configure`")
 	}
 
-	verifyScriptErr := expt.codeRepo.Repl(
-		expt.configRoot,
+	verifyScriptErr := expt.codeRepo.RunRepl(
+		expt.config.fileManager.GetConfigRoot(),
 		expt.config.fileManager.ScriptPath())
 	if verifyScriptErr != nil {
 		return verifyScriptErr
+	}
+
+	return nil
+}
+
+func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, schema *schema.Experiment) error {
+	// Create corpus samples.
+	sampleDirErr := fileManager.CreateSampleDirectories()
+	if sampleDirErr != nil {
+		return sampleDirErr
+	}
+	for _, sample := range schema.Samples {
+		samplePath, ok := fileManager.GetSamplePath(sample.Name)
+		if !ok {
+			return fmt.Errorf("Tried to create corpus sample for name '%s', "+
+				"but this name didn't appear in experiment schema",
+				sample.Name)
+		}
+		filterErr := repo.RunFilter(
+			fileManager.ConfigManifestPath(),
+			samplePath,
+			sample.AsFilterArg())
+		if filterErr != nil {
+			return filterErr
+		}
+	}
+
+	// Generate corpus statistics.
+	statsManifestPath, ok :=
+		fileManager.GetSampleManifestPath(schema.StatisticsConfig.SampleName)
+	if !ok {
+		return fmt.Errorf("Statistics configuration requires sample with "+
+			"name '%s', but a sample with that name was not found in "+
+			"experiment schema", schema.StatisticsConfig.SampleName)
+	}
+	statisticsErr := repo.RunStatistics(
+		statsManifestPath,
+		fileManager.GetConfigRoot())
+	if statisticsErr != nil {
+		return statisticsErr
+	}
+
+	// Generate term table.
+	termTableErr := repo.RunTermTable(fileManager.GetConfigRoot())
+	if termTableErr != nil {
+		return termTableErr
 	}
 
 	return nil
@@ -164,4 +210,13 @@ func buildBitFunnelAtRevision(bf bfrepo.Manager, revisionSha string) error {
 	}
 
 	return nil
+}
+
+func sampleNames(samples []*schema.Sample) []string {
+	var names = make([]string, len(samples))
+	for index, sample := range samples {
+		names[index] = sample.Name
+	}
+
+	return names
 }

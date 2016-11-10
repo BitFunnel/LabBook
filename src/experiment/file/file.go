@@ -17,40 +17,91 @@ import (
 // fetching remote script and manifest files, writing them to the config, and
 // so on.
 type Manager interface {
+	// TODO: Preface all these getter functions with `Get...`
+	GetConfigRoot() string
+	CreateSampleDirectories() error
+	GetSamplePath(sampleName string) (string, bool)
+	GetSampleManifestPath(sampleName string) (string, bool)
 	ScriptPath() string
 	ConfigManifestPath() string
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
-	FetchMetadataAndWriteScript(queryLogURL *url.URL, queryLogSHA512 string) error
+	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
 }
 
 // NewManager creates a new Manager object.
-func NewManager(configRoot string, corpusRoot string, experimentRoot string) Manager {
+func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) Manager {
+	configRoot := filepath.Join(experimentRoot, "configuration")
 	configManifestPath := filepath.Join(configRoot, "config_manifest.txt")
+	runtimeManifestPath := filepath.Join(configRoot, "runtime_manifest.txt")
 	scriptPath := filepath.Join(configRoot, "script.txt")
 	verifyOutPath := filepath.Join(experimentRoot, "verify_out")
 	noVerifyOutPath := filepath.Join(experimentRoot, "no_verify_out")
+	sampleRoot := filepath.Join(experimentRoot, "samples")
+
+	samplePaths := make(map[string]string, len(sampleNames))
+	for _, sampleName := range sampleNames {
+		samplePaths[sampleName] = filepath.Join(sampleRoot, sampleName)
+	}
+
 	return managerContext{
-		configRoot:         configRoot,
-		corpusRoot:         corpusRoot,
-		scriptPath:         scriptPath,
-		verifyOutPath:      verifyOutPath,
-		noVerifyOutPath:    noVerifyOutPath,
-		configManifestPath: configManifestPath,
+		configRoot:          configRoot,
+		corpusRoot:          corpusRoot,
+		sampleRoot:          sampleRoot,
+		samplePaths:         samplePaths,
+		scriptPath:          scriptPath,
+		verifyOutPath:       verifyOutPath,
+		noVerifyOutPath:     noVerifyOutPath,
+		configManifestPath:  configManifestPath,
+		runtimeManifestPath: runtimeManifestPath,
 	}
 }
 
 type managerContext struct {
-	configRoot         string
-	corpusRoot         string
-	scriptPath         string
-	verifyOutPath      string
-	noVerifyOutPath    string
-	configManifestPath string
+	configRoot          string
+	corpusRoot          string
+	sampleRoot          string
+	samplePaths         map[string]string
+	scriptPath          string
+	verifyOutPath       string
+	noVerifyOutPath     string
+	configManifestPath  string
+	runtimeManifestPath string
+}
+
+func (m managerContext) GetConfigRoot() string {
+	return m.configRoot
+}
+
+func (m managerContext) CreateSampleDirectories() error {
+	for _, samplePath := range m.samplePaths {
+		mkdirFilteredCorpusRoot := fs.MkdirAll(samplePath, 0777)
+		if mkdirFilteredCorpusRoot != nil {
+			return fmt.Errorf("Unable to create filtered corpus directory "+
+				"'%s':\n%v", samplePath, mkdirFilteredCorpusRoot)
+		}
+	}
+
+	return nil
+}
+
+func (m managerContext) GetSamplePath(sampleName string) (string, bool) {
+	manifestPath, ok := m.samplePaths[sampleName]
+	return manifestPath, ok
+}
+
+func (m managerContext) GetSampleManifestPath(sampleName string) (string, bool) {
+	manifestPath, ok := m.samplePaths[sampleName]
+	return filepath.Join(manifestPath, "Manifest.txt"), ok
 }
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
 // writes them to the manifest file.
 func (m managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) error {
+	mkConfigRootErr := fs.MkdirAll(m.configRoot, 0777)
+	if mkConfigRootErr != nil {
+		return mkConfigRootErr
+	}
+
 	fileBytes := []byte(strings.Join(absoluteCorpusPaths, "\n"))
 	writeErr := fs.WriteFile(m.configManifestPath, fileBytes, 0666)
 	if writeErr != nil {
@@ -61,7 +112,7 @@ func (m managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) er
 	return nil
 }
 
-func (m managerContext) FetchMetadataAndWriteScript(queryLogURL *url.URL, queryLogSHA512 string) error {
+func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error {
 	queryLog, queryLogFetchErr := fetchFileLines(
 		queryLogURL.String(),
 		queryLogSHA512)
@@ -69,10 +120,11 @@ func (m managerContext) FetchMetadataAndWriteScript(queryLogURL *url.URL, queryL
 		return queryLogFetchErr
 	}
 
-	ingestManifestLines, readErr := readFileLines(m.configManifestPath)
-	if readErr != nil {
+	runtimeManifestFile, ok := m.GetSampleManifestPath(sampleName)
+	ingestManifestLines, readErr := readFileLines(runtimeManifestFile)
+	if !ok || readErr != nil {
 		return fmt.Errorf("Failed to read ingestion manifest at '%s' for "+
-			"experiment:\n%v", m.configManifestPath, readErr)
+			"experiment:\n%v", runtimeManifestFile, readErr)
 	}
 
 	writeScriptErr := m.writeScript(ingestManifestLines, queryLog)
@@ -209,7 +261,7 @@ func fetchFileLines(url string, validationSHA512 string) ([]string, error) {
 }
 
 func readFileLines(path string) ([]string, error) {
-	file, openErr := os.Open(path)
+	file, openErr := fs.Open(path)
 	if openErr != nil {
 		return nil, openErr
 	}

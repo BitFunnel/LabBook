@@ -2,10 +2,7 @@ package bfrepo
 
 import (
 	"fmt"
-	"os"
-
 	"path/filepath"
-
 	"strings"
 
 	"github.com/BitFunnel/LabBook/src/systems/fs"
@@ -26,8 +23,10 @@ type Manager interface {
 	Checkout(revision string) (shell.CmdHandle, error)
 	ConfigureBuild() error
 	Build() error
-	ConfigureRuntime(manifestFile string, configDir string) error
-	Repl(configDir string, scriptFile string) error
+	RunFilter(configManifestPath string, samplePath string, sampleArgs []string) error
+	RunStatistics(statsManifestPath string, configDir string) error
+	RunTermTable(configDir string) error
+	RunRepl(configDir string, scriptFile string) error
 }
 
 type bfRepoContext struct {
@@ -62,7 +61,7 @@ func (repo bfRepoContext) Clone() (cloneErr error) {
 
 // Fetch pulls the BitFunnel master from the canonical repository.
 func (repo bfRepoContext) Fetch() error {
-	chdirHandle, chdirErr := scopedChdir(repo.bitFunnelRoot)
+	chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}
@@ -94,7 +93,7 @@ func (repo bfRepoContext) Fetch() error {
 // `bitFunnelRoot`, and checks out a commit from the canonical GitHub
 // repository, specified by `sha`.
 func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
-	chdirHandle, chdirErr := scopedChdir(repo.bitFunnelRoot)
+	chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
 	if chdirErr != nil {
 		return nil, chdirErr
 	}
@@ -122,7 +121,7 @@ func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 
 	// Set dispose to reset the head when we're done with it.
 	resetHead := func() error {
-		chdirHandle, chdirErr := scopedChdir(repo.bitFunnelRoot)
+		chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
 		if chdirErr != nil {
 			return chdirErr
 		}
@@ -145,7 +144,7 @@ func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 // Configure switches to the directory of the BitFunnel root, and runs
 // the configuration script that generates a makefile.
 func (repo bfRepoContext) ConfigureBuild() error {
-	chdirHandle, chdirErr := scopedChdir(repo.bitFunnelRoot)
+	chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}
@@ -157,7 +156,7 @@ func (repo bfRepoContext) ConfigureBuild() error {
 
 // Build switches to the BitFunnel build directory, and builds the code.
 func (repo bfRepoContext) Build() error {
-	chdirHandle, chdirErr := scopedChdir(repo.buildRoot)
+	chdirHandle, chdirErr := fs.ScopedChdir(repo.buildRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}
@@ -167,53 +166,44 @@ func (repo bfRepoContext) Build() error {
 	return buildErr
 }
 
-// Repl runs the BitFunnel repl.
-func (repo bfRepoContext) ConfigureRuntime(manifestFile string, configDir string) error {
-	// TODO: Filter corpus here also.
+func (repo bfRepoContext) RunFilter(configManifestPath string, samplePath string, sampleArgs []string) error {
+	arguments := []string{
+		"filter",
+		configManifestPath,
+		samplePath,
+	}
+	arguments = append(
+		arguments,
+		sampleArgs...)
 
-	statisticsErr := shell.RunCommand(
+	return shell.RunCommand(
+		repo.bitFunnelExecutable,
+		arguments...)
+}
+
+func (repo bfRepoContext) RunStatistics(statsManifestPath string, configDir string) error {
+	// TODO: Check that this is configured.
+	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"statistics",
-		manifestFile,
+		statsManifestPath,
 		configDir,
 		"-text")
-	if statisticsErr != nil {
-		return statisticsErr
-	}
+}
 
-	termTableErr := shell.RunCommand(
+func (repo bfRepoContext) RunTermTable(configDir string) error {
+	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"termtable",
 		configDir)
-	if termTableErr != nil {
-		return termTableErr
-	}
-
-	return nil
 }
 
-// Repl runs the BitFunnel repl.
-func (repo bfRepoContext) Repl(configDir string, scriptFile string) error {
+// RunRepl runs the BitFunnel repl.
+func (repo bfRepoContext) RunRepl(configDir string, scriptFile string) error {
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"repl",
 		configDir,
 		"-script",
 		scriptFile)
-}
-
-// scopedChdir changes to `directory` and then, when `Dispose` is
-// called, it changes back to the current working directory.
-func scopedChdir(directory string) (shell.CmdHandle, error) {
-	pwd, pwdErr := os.Getwd()
-	if pwdErr != nil {
-		return nil, pwdErr
-	}
-
-	chdirErr := fs.Chdir(directory)
-	if chdirErr != nil {
-		return nil, chdirErr
-	}
-
-	return shell.MakeHandle(func() error { return fs.Chdir(pwd) }), nil
 }

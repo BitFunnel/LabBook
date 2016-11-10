@@ -1,6 +1,9 @@
 package schema
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Sample represents a sample of the corpus. This sample can incorporate size
 // constraints on the documents, a random component (i.e., we can choose a
@@ -18,6 +21,44 @@ type Sample struct {
 	SizeConstraint   *SizeConstraint   `yaml:"size-limits"`
 }
 
+// AsFilterArg will represent the sample as arguments to BitFunnel's filter
+// command.
+func (sample *Sample) AsFilterArg() []string {
+	var arguments []string
+
+	if sample.GramSize != nil {
+		arguments = append(
+			arguments,
+			"-gramsize",
+			fmt.Sprintf("%d", *sample.GramSize))
+	}
+
+	if sample.MaxDocuments != nil {
+		arguments = append(
+			arguments,
+			"-count",
+			fmt.Sprintf("%d", *sample.MaxDocuments))
+	}
+
+	if sample.RandomnessConfig != nil {
+		arguments = append(
+			arguments,
+			"-random",
+			fmt.Sprintf("%d", sample.RandomnessConfig.Seed),
+			fmt.Sprintf("%f", sample.RandomnessConfig.Fraction))
+	}
+
+	if sample.SizeConstraint != nil {
+		arguments = append(
+			arguments,
+			"-size",
+			fmt.Sprintf("%d", sample.SizeConstraint.MinPostings),
+			fmt.Sprintf("%d", sample.SizeConstraint.MaxPostings))
+	}
+
+	return arguments
+}
+
 func (sample *Sample) validate() error {
 	if sample.Name == "" {
 		return errors.New("Experiment schema specifies a sample without a " +
@@ -32,13 +73,13 @@ func (sample *Sample) validate() error {
 // us how big to make the sample.
 type RandomnessConfig struct {
 	Seed     int     `yaml:"seed"`
-	Fraction float64 `yaml:"Fraction"`
+	Fraction float64 `yaml:"fraction"`
 }
 
 // SizeConstraint eoncodes instructions for selecting all documents in the
 // corpus with `MinPostings` or more, and `MaxPostings` or fewer (i.e., it's an
 // inclusive range).
 type SizeConstraint struct {
-	MinPostings uint `yaml:"min-postings"`
-	MaxPostings uint `yaml:"max-postings"`
+	MinPostings uint `yaml:"min-posting-count"`
+	MaxPostings uint `yaml:"max-posting-count"`
 }

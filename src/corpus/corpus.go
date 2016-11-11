@@ -29,6 +29,8 @@ func NewManager(chunks []*Chunk, corpusRoot string) Manager {
 	}
 }
 
+// Uncompress will uncompress the corpus files that `ctx` is responsible for
+// managing.
 func (ctx *corpusContext) Uncompress() error {
 	if ctx.uncompressed {
 		return fmt.Errorf("Corpus at '%s' has already been uncompressed",

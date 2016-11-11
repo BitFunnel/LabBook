@@ -46,6 +46,13 @@ func New(experimentRoot string, bitFunnelRoot string, corpusRoot string) Experim
 	}
 }
 
+// Configure completely configures the experiment that `expt` is managing. Each
+// `Experiment` typically manages exactly one experiment described by an
+// experiment schema YAML file, and `Configure` will do everything needed to
+// configure this experiment to run. This includes everything from cloning,
+// configuring, and building BitFunnel, to managing uncompressing the corpus,
+// to running `statistics` and `termtable` on the corpus to configure the
+// BitFunnel runtime.
 func (expt *experimentContext) Configure(reader io.Reader) error {
 	if expt.configured == true {
 		return errors.New("Experiments can't be configured twice")
@@ -114,8 +121,8 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 	return nil
 }
 
-// Run deserializes an experiment schema from `reader` and attempts to run the
-// experiment.
+// Runs the experiment described in the experiment schema `expt` is responsible
+// for managing.
 func (expt *experimentContext) Run() error {
 	if expt.configured == false {
 		return errors.New("Can't run experiment without calling `Configure`")

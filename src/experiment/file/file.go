@@ -17,14 +17,14 @@ import (
 // fetching remote script and manifest files, writing them to the config, and
 // so on.
 type Manager interface {
-	GetConfigRoot() string
 	CreateSampleDirectories() error
+	WriteConfigManifestFile(absoluteCorpusPaths []string) error
+	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
+	GetConfigRoot() string
 	GetSamplePath(sampleName string) (string, bool)
 	GetSampleManifestPath(sampleName string) (string, bool)
 	GetScriptPath() string
 	GetConfigManifestPath() string
-	WriteConfigManifestFile(absoluteCorpusPaths []string) error
-	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
 }
 
 // NewManager creates a new Manager object.
@@ -67,10 +67,17 @@ type managerContext struct {
 	runtimeManifestPath string
 }
 
+// GetConfigRoot will get the path to the root of the directory that contains
+// configuration information for BitFunnel's runtime (e.g., files for the term
+// table, statistics, etc.)
 func (m managerContext) GetConfigRoot() string {
 	return m.configRoot
 }
 
+// CreateSampleDirectories will create the directories we'll need to generate
+// the filtered samples for an experiment. For example, if an experiment
+// defines 2 samples with names `sample1` and `sample2`, this will create
+// directories for each.
 func (m managerContext) CreateSampleDirectories() error {
 	for _, samplePath := range m.samplePaths {
 		mkdirFilteredCorpusRoot := fs.MkdirAll(samplePath, 0777)
@@ -83,11 +90,18 @@ func (m managerContext) CreateSampleDirectories() error {
 	return nil
 }
 
+// GetSamplePath will get the canonical directory meant to hold the sample of
+// the corpus denoted by `sampleName`. For example, if we have a sample called
+// `sample1`, this will return the directory that corresponds to that sample.
 func (m managerContext) GetSamplePath(sampleName string) (string, bool) {
 	manifestPath, ok := m.samplePaths[sampleName]
 	return manifestPath, ok
 }
 
+// GetSampleManifestPath will return the canonical manifest file generated for
+// an experiment's corpus sample. For example, if we have a sample named
+// `sample1`, this will return a manifest file listing all the files in the
+// corpus sample `sample1`.
 func (m managerContext) GetSampleManifestPath(sampleName string) (string, bool) {
 	manifestPath, ok := m.samplePaths[sampleName]
 	return filepath.Join(manifestPath, "Manifest.txt"), ok
@@ -111,6 +125,9 @@ func (m managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) er
 	return nil
 }
 
+// FetchMetadataAndWriteScript will fetch the metadata needed to generate a
+// script for an experiment (e.g., a query log), and then generates and writes
+// the script.
 func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error {
 	queryLog, queryLogFetchErr := fetchFileLines(
 		queryLogURL.String(),
@@ -135,10 +152,17 @@ func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogU
 	return nil
 }
 
+// GetScriptPath will return the path to the canonical script file for the
+// experiment.
 func (m managerContext) GetScriptPath() string {
+	// TODO: Check that this was actually generated?
 	return m.scriptPath
 }
 
+// GetConfigManifestPath will return the path to the canonical manifest file of
+// the corpus sample used to configure the experiment. Typically this is given
+// to the BitFunnel tools to generate a sample of the corpus to runtime
+// `statistics` and `termtable` on (for example).
 func (m managerContext) GetConfigManifestPath() string {
 	return m.configManifestPath
 }

@@ -47,6 +47,7 @@ func New(bitFunnelRoot string) Manager {
 	}
 }
 
+// GetPath returns the root path of the BitFunnel repository `repo` manages.
 func (repo bfRepoContext) GetPath() string {
 	return repo.bitFunnelRoot
 }
@@ -166,6 +167,7 @@ func (repo bfRepoContext) Build() error {
 	return buildErr
 }
 
+// RunFilter runs the `filter` command in the BitFunnel executable tool.
 func (repo bfRepoContext) RunFilter(configManifestPath string, samplePath string, sampleArgs []string) error {
 	arguments := []string{
 		"filter",
@@ -181,6 +183,7 @@ func (repo bfRepoContext) RunFilter(configManifestPath string, samplePath string
 		arguments...)
 }
 
+// RunStatistics runs the `statistics` command in the BitFunnel executable tool.
 func (repo bfRepoContext) RunStatistics(statsManifestPath string, configDir string) error {
 	// TODO: Check that this is configured.
 	return shell.RunCommand(
@@ -191,6 +194,7 @@ func (repo bfRepoContext) RunStatistics(statsManifestPath string, configDir stri
 		"-text")
 }
 
+// RunTermTable runs the `termtable` command in the BitFunnel executable tool.
 func (repo bfRepoContext) RunTermTable(configDir string) error {
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,

@@ -65,6 +65,9 @@ type scopedCommand struct {
 	dispose func() error
 }
 
+// Dispose performs the cleanup operation for a `CmdHandle`. For example, if
+// we've run `os.Chdir` and returned a `CmdHandle`, we might have `Dispose`
+// call `os.Chdir` to return to the original directory we were in.
 func (c scopedCommand) Dispose() error {
 	return c.dispose()
 }

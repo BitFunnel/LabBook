@@ -123,7 +123,7 @@ func (expt *experimentContext) Run() error {
 
 	verifyScriptErr := expt.codeRepo.RunRepl(
 		expt.config.fileManager.GetConfigRoot(),
-		expt.config.fileManager.ScriptPath())
+		expt.config.fileManager.GetScriptPath())
 	if verifyScriptErr != nil {
 		return verifyScriptErr
 	}
@@ -145,7 +145,7 @@ func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, sc
 				sample.Name)
 		}
 		filterErr := repo.RunFilter(
-			fileManager.ConfigManifestPath(),
+			fileManager.GetConfigManifestPath(),
 			samplePath,
 			sample.AsFilterArg())
 		if filterErr != nil {
@@ -179,7 +179,7 @@ func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, sc
 
 func buildBitFunnelAtRevision(bf bfrepo.Manager, revisionSha string) error {
 	// Either clone or fetch the canonical BitFunnel repository.
-	if !util.Exists(bf.Path()) {
+	if !util.Exists(bf.GetPath()) {
 		cloneErr := bf.Clone()
 		if cloneErr != nil {
 			return cloneErr

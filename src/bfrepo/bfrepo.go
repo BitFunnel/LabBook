@@ -17,7 +17,7 @@ const bitfunnelSSHRemote = `git@github.com:bitfunnel/bitfunnel.git`
 // cloning, to checking out a specific version, to building BitFunnel, to
 // runinng the REPL.
 type Manager interface {
-	Path() string
+	GetPath() string
 	Clone() error
 	Fetch() error
 	Checkout(revision string) (shell.CmdHandle, error)
@@ -47,7 +47,7 @@ func New(bitFunnelRoot string) Manager {
 	}
 }
 
-func (repo bfRepoContext) Path() string {
+func (repo bfRepoContext) GetPath() string {
 	return repo.bitFunnelRoot
 }
 

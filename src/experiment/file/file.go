@@ -17,13 +17,12 @@ import (
 // fetching remote script and manifest files, writing them to the config, and
 // so on.
 type Manager interface {
-	// TODO: Preface all these getter functions with `Get...`
 	GetConfigRoot() string
 	CreateSampleDirectories() error
 	GetSamplePath(sampleName string) (string, bool)
 	GetSampleManifestPath(sampleName string) (string, bool)
-	ScriptPath() string
-	ConfigManifestPath() string
+	GetScriptPath() string
+	GetConfigManifestPath() string
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
 	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
 }
@@ -136,11 +135,11 @@ func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogU
 	return nil
 }
 
-func (m managerContext) ScriptPath() string {
+func (m managerContext) GetScriptPath() string {
 	return m.scriptPath
 }
 
-func (m managerContext) ConfigManifestPath() string {
+func (m managerContext) GetConfigManifestPath() string {
 	return m.configManifestPath
 }
 

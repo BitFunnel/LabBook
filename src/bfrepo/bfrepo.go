@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BitFunnel/LabBook/src/bfrepo/git"
 	"github.com/BitFunnel/LabBook/src/systems/fs"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
 )
@@ -17,7 +18,7 @@ const bitfunnelSSHRemote = `git@github.com:bitfunnel/bitfunnel.git`
 // cloning, to checking out a specific version, to building BitFunnel, to
 // runinng the REPL.
 type Manager interface {
-	GetPath() string
+	GetGitManager() git.RepoManager
 	Clone() error
 	Fetch() error
 	Checkout(revision string) (shell.CmdHandle, error)
@@ -30,7 +31,7 @@ type Manager interface {
 }
 
 type bfRepoContext struct {
-	bitFunnelRoot       string
+	gitRepo             git.RepoManager
 	buildRoot           string
 	bitFunnelExecutable string
 }
@@ -40,36 +41,29 @@ func New(bitFunnelRoot string) Manager {
 	buildRoot := filepath.Join(bitFunnelRoot, "build-make")
 	bitFunnelExecutable :=
 		filepath.Join(buildRoot, "tools", "BitFunnel", "src", "BitFunnel")
+	gitRepo := git.NewRepoManager(bitfunnelHTTPSRemote, bitFunnelRoot)
 	return bfRepoContext{
-		bitFunnelRoot:       bitFunnelRoot,
+		gitRepo:             gitRepo,
 		buildRoot:           buildRoot,
 		bitFunnelExecutable: bitFunnelExecutable,
 	}
 }
 
-// GetPath returns the root path of the BitFunnel repository `repo` manages.
-func (repo bfRepoContext) GetPath() string {
-	return repo.bitFunnelRoot
+// GetGitManager returns the `RepoManager` that manages the underlying BitFunnel
+// git repository.
+func (repo bfRepoContext) GetGitManager() git.RepoManager {
+	return repo.gitRepo
 }
 
 // Clone clones the canonical GitHub repository, into the folder
 // `bitFunnelRoot`.
-func (repo bfRepoContext) Clone() (cloneErr error) {
-	cloneErr =
-		shell.RunCommand("git", "clone", bitfunnelHTTPSRemote, repo.bitFunnelRoot)
-	return
+func (repo bfRepoContext) Clone() error {
+	return repo.gitRepo.CloneFromOrigin()
 }
 
 // Fetch pulls the BitFunnel master from the canonical repository.
 func (repo bfRepoContext) Fetch() error {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
-	if chdirErr != nil {
-		return chdirErr
-	}
-	defer chdirHandle.Dispose()
-
-	originURL, originURLErr :=
-		shell.CommandOutput("git", "config", "--get", "remote.origin.url")
+	originURL, originURLErr := repo.gitRepo.GetConfig("remote.origin.url")
 	if originURLErr != nil {
 		return originURLErr
 	}
@@ -80,13 +74,14 @@ func (repo bfRepoContext) Fetch() error {
 		lowerOriginURL != bitfunnelHTTPSRemote {
 		return fmt.Errorf("The remote 'origin' in the repository located at "+
 			"%s' is required to point at the canonical BitFunnel repository.",
-			repo.bitFunnelRoot)
+			repo.gitRepo.GetRepoRootPath())
 	}
 
-	pullErr := shell.RunCommand("git", "fetch", "origin")
+	pullErr := repo.gitRepo.Fetch("origin")
 	if pullErr != nil {
 		return pullErr
 	}
+
 	return nil
 }
 
@@ -94,40 +89,27 @@ func (repo bfRepoContext) Fetch() error {
 // `bitFunnelRoot`, and checks out a commit from the canonical GitHub
 // repository, specified by `sha`.
 func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
-	if chdirErr != nil {
-		return nil, chdirErr
-	}
-	defer chdirHandle.Dispose()
-
 	// Returns the "short name" of HEAD. Usually this is a branch, like
 	// `master`, but if HEAD is detached, it can also simply be `HEAD`.
-	headRef, headRefErr :=
-		shell.CommandOutput("git", "rev-parse", "--abbrev-ref=strict", "HEAD")
+	headRef, headRefErr := repo.gitRepo.GetRevParseStrictRef("HEAD")
 	if headRefErr != nil {
 		return nil, headRefErr
 	}
 
 	// The commit hash for HEAD.
-	headSha, headShaErr := shell.CommandOutput("git", "rev-parse", "HEAD")
+	headSha, headShaErr := repo.gitRepo.GetRevParseRef("HEAD")
 	if headShaErr != nil {
 		return nil, headShaErr
 	}
 
 	// Checkout commit denoted with `sha`.
-	checkoutErr := shell.RunCommand("git", "checkout", sha)
+	checkoutErr := repo.gitRepo.Checkout(sha)
 	if checkoutErr != nil {
 		return nil, checkoutErr
 	}
 
 	// Set dispose to reset the head when we're done with it.
 	resetHead := func() error {
-		chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
-		if chdirErr != nil {
-			return chdirErr
-		}
-		defer chdirHandle.Dispose()
-
 		var presentRef string
 		if headRef == "HEAD" {
 			presentRef = headSha
@@ -135,7 +117,7 @@ func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 			presentRef = headRef
 		}
 
-		checkoutErr := shell.RunCommand("git", "checkout", presentRef)
+		checkoutErr := repo.gitRepo.Checkout(presentRef)
 		return checkoutErr
 	}
 
@@ -145,7 +127,7 @@ func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 // Configure switches to the directory of the BitFunnel root, and runs
 // the configuration script that generates a makefile.
 func (repo bfRepoContext) ConfigureBuild() error {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.bitFunnelRoot)
+	chdirHandle, chdirErr := fs.ScopedChdir(repo.gitRepo.GetRepoRootPath())
 	if chdirErr != nil {
 		return chdirErr
 	}

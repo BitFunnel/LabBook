@@ -57,7 +57,7 @@ func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, sc
 
 func buildBitFunnelAtRevision(bf bfrepo.Manager, revisionSha string) error {
 	// Either clone or fetch the canonical BitFunnel repository.
-	if !util.Exists(bf.GetPath()) {
+	if !util.Exists(bf.GetGitManager().GetRepoRootPath()) {
 		cloneErr := bf.Clone()
 		if cloneErr != nil {
 			return cloneErr

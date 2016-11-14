@@ -65,7 +65,7 @@ func CommandOutput(command string, args ...string) (string, error) {
 
 // MakeHandle makes a command handle that calls `cleanup` during a `Dispose`.
 func MakeHandle(cleanup func() error) CmdHandle {
-	return scopedCommand{dispose: cleanup}
+	return &scopedCommand{dispose: cleanup}
 }
 
 type scopedCommand struct {
@@ -75,6 +75,6 @@ type scopedCommand struct {
 // Dispose performs the cleanup operation for a `CmdHandle`. For example, if
 // we've run `os.Chdir` and returned a `CmdHandle`, we might have `Dispose`
 // call `os.Chdir` to return to the original directory we were in.
-func (c scopedCommand) Dispose() error {
+func (c *scopedCommand) Dispose() error {
 	return c.dispose()
 }

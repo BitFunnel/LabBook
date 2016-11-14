@@ -132,7 +132,7 @@ func corpusFileVisitor(corpusFiles *[]string, path string, fileInfo os.FileInfo,
 	return nil
 }
 
-func (chunk Chunk) validate(reader io.Reader) bool {
+func (chunk *Chunk) validate(reader io.Reader) bool {
 	stream, readErr := ioutil.ReadAll(reader)
 	if readErr != nil {
 		return false

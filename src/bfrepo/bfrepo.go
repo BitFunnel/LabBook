@@ -42,7 +42,7 @@ func New(bitFunnelRoot string) Manager {
 	bitFunnelExecutable :=
 		filepath.Join(buildRoot, "tools", "BitFunnel", "src", "BitFunnel")
 	gitRepo := git.NewRepoManager(bitfunnelHTTPSRemote, bitFunnelRoot)
-	return bfRepoContext{
+	return &bfRepoContext{
 		gitRepo:             gitRepo,
 		buildRoot:           buildRoot,
 		bitFunnelExecutable: bitFunnelExecutable,
@@ -51,18 +51,18 @@ func New(bitFunnelRoot string) Manager {
 
 // GetGitManager returns the `RepoManager` that manages the underlying BitFunnel
 // git repository.
-func (repo bfRepoContext) GetGitManager() git.RepoManager {
+func (repo *bfRepoContext) GetGitManager() git.RepoManager {
 	return repo.gitRepo
 }
 
 // Clone clones the canonical GitHub repository, into the folder
 // `bitFunnelRoot`.
-func (repo bfRepoContext) Clone() error {
+func (repo *bfRepoContext) Clone() error {
 	return repo.gitRepo.CloneFromOrigin()
 }
 
 // Fetch pulls the BitFunnel master from the canonical repository.
-func (repo bfRepoContext) Fetch() error {
+func (repo *bfRepoContext) Fetch() error {
 	originURL, originURLErr := repo.gitRepo.GetConfig("remote.origin.url")
 	if originURLErr != nil {
 		return originURLErr
@@ -88,7 +88,7 @@ func (repo bfRepoContext) Fetch() error {
 // Checkout take a path to a canonical BitFunnel repository,
 // `bitFunnelRoot`, and checks out a commit from the canonical GitHub
 // repository, specified by `sha`.
-func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
+func (repo *bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 	// Returns the "short name" of HEAD. Usually this is a branch, like
 	// `master`, but if HEAD is detached, it can also simply be `HEAD`.
 	headRef, headRefErr := repo.gitRepo.GetRevParseStrictRef("HEAD")
@@ -126,7 +126,7 @@ func (repo bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 
 // Configure switches to the directory of the BitFunnel root, and runs
 // the configuration script that generates a makefile.
-func (repo bfRepoContext) ConfigureBuild() error {
+func (repo *bfRepoContext) ConfigureBuild() error {
 	chdirHandle, chdirErr := fs.ScopedChdir(repo.gitRepo.GetRepoRootPath())
 	if chdirErr != nil {
 		return chdirErr
@@ -138,7 +138,7 @@ func (repo bfRepoContext) ConfigureBuild() error {
 }
 
 // Build switches to the BitFunnel build directory, and builds the code.
-func (repo bfRepoContext) Build() error {
+func (repo *bfRepoContext) Build() error {
 	chdirHandle, chdirErr := fs.ScopedChdir(repo.buildRoot)
 	if chdirErr != nil {
 		return chdirErr
@@ -150,7 +150,7 @@ func (repo bfRepoContext) Build() error {
 }
 
 // RunFilter runs the `filter` command in the BitFunnel executable tool.
-func (repo bfRepoContext) RunFilter(configManifestPath string, samplePath string, sampleArgs []string) error {
+func (repo *bfRepoContext) RunFilter(configManifestPath string, samplePath string, sampleArgs []string) error {
 	arguments := []string{
 		"filter",
 		configManifestPath,
@@ -166,7 +166,7 @@ func (repo bfRepoContext) RunFilter(configManifestPath string, samplePath string
 }
 
 // RunStatistics runs the `statistics` command in the BitFunnel executable tool.
-func (repo bfRepoContext) RunStatistics(statsManifestPath string, configDir string) error {
+func (repo *bfRepoContext) RunStatistics(statsManifestPath string, configDir string) error {
 	// TODO: Check that this is configured.
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
@@ -177,7 +177,7 @@ func (repo bfRepoContext) RunStatistics(statsManifestPath string, configDir stri
 }
 
 // RunTermTable runs the `termtable` command in the BitFunnel executable tool.
-func (repo bfRepoContext) RunTermTable(configDir string) error {
+func (repo *bfRepoContext) RunTermTable(configDir string) error {
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"termtable",
@@ -185,7 +185,7 @@ func (repo bfRepoContext) RunTermTable(configDir string) error {
 }
 
 // RunRepl runs the BitFunnel repl.
-func (repo bfRepoContext) RunRepl(configDir string, scriptFile string) error {
+func (repo *bfRepoContext) RunRepl(configDir string, scriptFile string) error {
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"repl",

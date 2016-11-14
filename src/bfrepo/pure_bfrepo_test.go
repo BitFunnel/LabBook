@@ -58,7 +58,7 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 
 		checkoutHandle, checkoutErr := repo.Checkout(revisionSha)
 		assert.NoError(suite.T(), checkoutErr)
-		defer checkoutHandle.Dispose()
+		checkoutHandle.Dispose()
 	}
 
 	// Verify.
@@ -71,10 +71,27 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 	eventLog := systems.OpLog().GetEventLog()
 	targetLog := []string{
 		`[FS] os.Chdir(".")`,
+		`[SHELL] git config --get remote.origin.url`,
+		chdirCmd,
+
+		`[FS] os.Chdir(".")`,
 		`[SHELL] git fetch origin`,
 		chdirCmd,
+
+		`[FS] os.Chdir(".")`,
+		`[SHELL] git rev-parse --abbrev-ref=strict HEAD`,
+		chdirCmd,
+
+		`[FS] os.Chdir(".")`,
+		`[SHELL] git rev-parse HEAD`,
+		chdirCmd,
+
 		`[FS] os.Chdir(".")`,
 		checkoutCmd,
+		chdirCmd,
+
+		`[FS] os.Chdir(".")`,
+		`[SHELL] git checkout master`,
 		chdirCmd,
 	}
 	labtest.AssertEventsEqual(suite.T(), targetLog, eventLog)

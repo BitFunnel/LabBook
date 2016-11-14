@@ -35,9 +35,7 @@ type CmdHandle interface {
 // and stdout.
 func RunCommand(command string, args ...string) error {
 	if systems.IsDryRun() {
-		operation := newShellOperation(command, args)
-		systems.OpLog().Log(operation)
-
+		systems.OpLog().Log(newShellOperation(command, args))
 		return nil
 	}
 
@@ -51,10 +49,8 @@ func RunCommand(command string, args ...string) error {
 // returns it as a string.
 func CommandOutput(command string, args ...string) (string, error) {
 	if systems.IsDryRun() {
-		operation := newShellOperation(command, args)
-		systems.OpLog().Log(operation)
-
-		// We expect output, so don't return nil here.
+		systems.OpLog().Log(newShellOperation(command, args))
+		return "", nil
 	}
 
 	cmd := exec.Command(command, args...)

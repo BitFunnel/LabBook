@@ -14,12 +14,12 @@ type shellOperation struct {
 	args    []string
 }
 
-func (shellOp shellOperation) String() string {
+func (shellOp *shellOperation) String() string {
 	return fmt.Sprintf("[SHELL] %s %s", shellOp.command, strings.Join(shellOp.args, " "))
 }
 
 func newShellOperation(command string, args []string) systems.Operation {
-	return shellOperation{command: command, args: args}
+	return &shellOperation{command: command, args: args}
 }
 
 // CmdHandle allows automatic cleanup after complex commands. For example,
@@ -36,7 +36,7 @@ type CmdHandle interface {
 func RunCommand(command string, args ...string) error {
 	if systems.IsDryRun() {
 		operation := newShellOperation(command, args)
-		systems.OpLog().Log(&operation)
+		systems.OpLog().Log(operation)
 
 		return nil
 	}
@@ -50,6 +50,13 @@ func RunCommand(command string, args ...string) error {
 // CommandOutput synchronously executes a command, captures the stdout, and
 // returns it as a string.
 func CommandOutput(command string, args ...string) (string, error) {
+	if systems.IsDryRun() {
+		operation := newShellOperation(command, args)
+		systems.OpLog().Log(operation)
+
+		// We expect output, so don't return nil here.
+	}
+
 	cmd := exec.Command(command, args...)
 	cmd.Stderr = os.Stderr
 	output, cmdErr := cmd.Output()

@@ -13,20 +13,19 @@ type fsOperation struct {
 	opString string
 }
 
-func (fsOp fsOperation) String() string {
+func (fsOp *fsOperation) String() string {
 	return fmt.Sprintf("[FS] %s", fsOp.opString)
 }
 
 func newFsOperation(fsOp string) systems.Operation {
-	return fsOperation{opString: fsOp}
+	return &fsOperation{opString: fsOp}
 }
 
 // Open is a mockable wrapper for `os.Open`.
 func Open(name string) (*os.File, error) {
 	if systems.IsDryRun() {
 		operationText := fmt.Sprintf(`os.Open("%s")`, name)
-		operation := newFsOperation(operationText)
-		systems.OpLog().Log(&operation)
+		systems.OpLog().Log(newFsOperation(operationText))
 
 		return os.Open(os.DevNull)
 	}
@@ -54,8 +53,7 @@ func ScopedChdir(directory string) (shell.CmdHandle, error) {
 func MkdirAll(path string, perm os.FileMode) error {
 	if systems.IsDryRun() {
 		operationText := fmt.Sprintf(`os.MkdirAll("%s", 0%o)`, path, perm)
-		operation := newFsOperation(operationText)
-		systems.OpLog().Log(&operation)
+		systems.OpLog().Log(newFsOperation(operationText))
 
 		return nil
 	}
@@ -67,8 +65,7 @@ func MkdirAll(path string, perm os.FileMode) error {
 func Create(name string) (*os.File, error) {
 	if systems.IsDryRun() {
 		operationText := fmt.Sprintf(`os.Create("%s")`, name)
-		operation := newFsOperation(operationText)
-		systems.OpLog().Log(&operation)
+		systems.OpLog().Log(newFsOperation(operationText))
 
 		return os.OpenFile(os.DevNull, os.O_WRONLY, 0777)
 	}
@@ -80,8 +77,7 @@ func Create(name string) (*os.File, error) {
 func WriteFile(filename string, data []byte, perm os.FileMode) error {
 	if systems.IsDryRun() {
 		operationText := fmt.Sprintf(`ioutil.WriteFile("%s", ..., 0%o)`, filename, perm)
-		operation := newFsOperation(operationText)
-		systems.OpLog().Log(&operation)
+		systems.OpLog().Log(newFsOperation(operationText))
 
 		return nil
 	}
@@ -95,8 +91,7 @@ func chdir(dir string) error {
 		// NOTE: This is not a potentially deleterious operaiton, so we don't
 		// return early.
 		operationText := fmt.Sprintf(`os.Chdir("%s")`, dir)
-		operation := newFsOperation(operationText)
-		systems.OpLog().Log(&operation)
+		systems.OpLog().Log(newFsOperation(operationText))
 	}
 
 	return os.Chdir(dir)

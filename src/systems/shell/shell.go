@@ -50,7 +50,10 @@ func RunCommand(command string, args ...string) error {
 func CommandOutput(command string, args ...string) (string, error) {
 	if systems.IsDryRun() {
 		systems.OpLog().Log(newShellOperation(command, args))
-		return "", nil
+
+		if systems.IsTestRun() {
+			return "", nil
+		}
 	}
 
 	cmd := exec.Command(command, args...)

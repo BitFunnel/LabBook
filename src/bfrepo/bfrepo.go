@@ -73,8 +73,10 @@ func (repo *bfRepoContext) Fetch() error {
 	if lowerOriginURL != bitfunnelSSHRemote &&
 		lowerOriginURL != bitfunnelHTTPSRemote {
 		return fmt.Errorf("The remote 'origin' in the repository located at "+
-			"%s' is required to point at the canonical BitFunnel repository.",
-			repo.gitRepo.GetRepoRootPath())
+			"%s' is required to point at the canonical BitFunnel "+
+			"repository, but instead points at '%s'",
+			repo.gitRepo.GetRepoRootPath(),
+			lowerOriginURL)
 	}
 
 	pullErr := repo.gitRepo.Fetch("origin")

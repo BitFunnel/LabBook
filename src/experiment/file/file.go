@@ -194,7 +194,7 @@ func (m managerContext) writeScript(manifestPaths []string, queryLog []string) e
 			continue
 		}
 		_, writeErr := w.WriteString(
-			fmt.Sprintf("cache chunk %s/%s\n", m.corpusRoot, path))
+			fmt.Sprintf("cache chunk %s\n", path))
 		if writeErr != nil {
 			return fmt.Errorf("Failed to write script file at '%s':\n%v",
 				m.scriptPath, writeErr)
@@ -249,7 +249,7 @@ func (m managerContext) writeQueriesToScript(w *os.File, queryLog []string, veri
 		}
 	}
 
-	_, writeErr = w.WriteString("analyze")
+	_, writeErr = w.WriteString("analyze\n")
 	if writeErr != nil {
 		return writeErr
 	}

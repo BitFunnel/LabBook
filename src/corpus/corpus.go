@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
 	"github.com/BitFunnel/LabBook/src/util"
 )
@@ -37,35 +37,48 @@ func (ctx *corpusContext) Uncompress() error {
 			ctx.corpusRoot)
 	}
 
+	// TODO: Implement locking protocol:
+	// * Acquire lock. When you're finished uncompressing, write new lock with
+	//   the signature.
+
+	signatureAccumulator := signature.NewCorpusSignatureAccumulator()
+
 	for _, chunk := range ctx.chunks {
-		if !strings.HasSuffix(chunk.Name, ".tar.gz") {
-			return fmt.Errorf("Corpus file '%s' is not a .tar.gz file",
-				chunk.Name)
+		chunkPath := ctx.getChunkPath(chunk)
+
+		tarballData, readErr := getCompressedChunkData(chunkPath)
+		if readErr != nil {
+			return readErr
 		}
 
-		chunkPath := filepath.Join(ctx.corpusRoot, chunk.Name)
-
-		if !util.Exists(chunkPath) {
-			return fmt.Errorf("Corpus file '%s' does not exist.", chunkPath)
-		}
-
-		chunkFile, openErr := os.Open(chunkPath)
-		if openErr != nil {
-			return openErr
-		}
-		defer chunkFile.Close()
-
-		if !chunk.validate(chunkFile) {
-			return fmt.Errorf("SHA512 hash for corpus file '%s' does not "+
-				"match the hash specified in experiment YAML", chunkPath)
+		tarballSignature, sigErr :=
+			signatureAccumulator.AddCorpusTarball(tarballData)
+		if sigErr != nil {
+			return sigErr
+		} else if tarballSignature != chunk.SHA512 {
+			return fmt.Errorf("Signature for corpus file '%s' does not "+
+				"match the hash specified in experiment YAML; it is "+
+				"possible you have specified an incorrect corpus file",
+				chunkPath)
 		}
 
 		// TODO: Probably we can avoid un-taring this all the time, and also
 		// use a pure solution.
-		tarErr := shell.RunCommand("tar", "-xf", chunkPath, "-C", ctx.corpusRoot)
+		tarErr := shell.RunCommand(
+			"tar",
+			"-xf",
+			chunkPath,
+			"-C",
+			ctx.corpusRoot)
 		if tarErr != nil {
 			return tarErr
 		}
+	}
+
+	// TODO: Have this return the signature.
+	_, sigErr := signatureAccumulator.Signature()
+	if sigErr != nil {
+		return sigErr
 	}
 
 	ctx.uncompressed = true
@@ -120,6 +133,36 @@ func (ctx *corpusContext) GetAllCorpusFilepaths() ([]string, error) {
 	return corpusFiles, nil
 }
 
+//
+// PRIVATE METHODS.
+//
+func (ctx *corpusContext) getChunkPath(chunk *Chunk) string {
+	return filepath.Join(ctx.corpusRoot, chunk.Name)
+}
+
+//
+// PRIVATE FUNCTIONS.
+//
+
+func getCompressedChunkData(chunkPath string) ([]byte, error) {
+	if !util.Exists(chunkPath) {
+		return nil, fmt.Errorf("Corpus file '%s' does not exist.", chunkPath)
+	}
+
+	chunkFile, openErr := os.Open(chunkPath)
+	if openErr != nil {
+		return nil, openErr
+	}
+	defer chunkFile.Close()
+
+	chunkStream, readErr := ioutil.ReadAll(chunkFile)
+	if readErr != nil {
+		return nil, fmt.Errorf("Failed to read corpus file '%s'", chunkPath)
+	}
+
+	return chunkStream, nil
+}
+
 func corpusFileVisitor(corpusFiles *[]string, path string, fileInfo os.FileInfo, err error) error {
 	if err != nil {
 		return err
@@ -146,6 +189,10 @@ type corpusContext struct {
 	corpusRoot   string
 	uncompressed bool
 }
+
+// TODO: Put `Chunk` in its own file?
+// TODO: Use validation step to populate a `Chunk.path` member?
+// TODO: Rename `Chunk`. It's not a chunk, it's a raw corpus tarball.
 
 // Chunk represents a tar'd file that contains a subset of the corpus. the
 // SHA512 hash is used to verify the version of the data is correct.

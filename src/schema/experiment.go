@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 
 	"github.com/BitFunnel/LabBook/src/corpus"
+	"github.com/BitFunnel/LabBook/src/util"
 	"github.com/go-yaml/yaml"
 )
 
@@ -96,6 +97,8 @@ func (experiment *Experiment) validate() error {
 			return errors.New("Experiment schema contained a corpus without " +
 				"the mandatory field `sha512`")
 		}
+
+		chunk.SHA512 = util.NormalizeSignature(chunk.SHA512)
 	}
 
 	return nil

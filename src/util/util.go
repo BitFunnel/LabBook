@@ -36,6 +36,8 @@ func NormalizeSignature(signature string) string {
 // configuration, and validate that it matches a given SHA512 hash.
 func ValidateSHA512(stream []byte, SHA512 string) bool {
 	hash := sha512.New()
+
+	// TODO: This actually returns an error. We should handle it correctly.
 	hash.Write(stream)
 	actualSha512Hash := fmt.Sprintf("%x", hash.Sum(nil))
 

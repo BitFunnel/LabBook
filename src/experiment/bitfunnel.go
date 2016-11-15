@@ -9,6 +9,41 @@ import (
 	"github.com/BitFunnel/LabBook/src/util"
 )
 
+func buildBitFunnelAtRevision(bf bfrepo.Manager, revisionSha string) error {
+	// Either clone or fetch the canonical BitFunnel repository.
+	if !util.Exists(bf.GetGitManager().GetRepoRootPath()) {
+		cloneErr := bf.Clone()
+		if cloneErr != nil {
+			return cloneErr
+		}
+	} else {
+		fetchErr := bf.Fetch()
+		if fetchErr != nil {
+			return fetchErr
+		}
+	}
+
+	// Checkout a revision related to some experiment; the `defer` will reset
+	// the HEAD to what it was before we checked it out.
+	checkoutHandle, checkoutErr := bf.Checkout(revisionSha)
+	if checkoutErr != nil {
+		return checkoutErr
+	}
+	defer checkoutHandle.Dispose()
+
+	configureErr := bf.ConfigureBuild()
+	if configureErr != nil {
+		return configureErr
+	}
+
+	buildErr := bf.Build()
+	if buildErr != nil {
+		return buildErr
+	}
+
+	return nil
+}
+
 func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, schema *schema.Experiment) error {
 	// Create corpus samples.
 	sampleDirErr := fileManager.CreateSampleDirectories()
@@ -50,41 +85,6 @@ func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, sc
 	termTableErr := repo.RunTermTable(fileManager.GetConfigRoot())
 	if termTableErr != nil {
 		return termTableErr
-	}
-
-	return nil
-}
-
-func buildBitFunnelAtRevision(bf bfrepo.Manager, revisionSha string) error {
-	// Either clone or fetch the canonical BitFunnel repository.
-	if !util.Exists(bf.GetGitManager().GetRepoRootPath()) {
-		cloneErr := bf.Clone()
-		if cloneErr != nil {
-			return cloneErr
-		}
-	} else {
-		fetchErr := bf.Fetch()
-		if fetchErr != nil {
-			return fetchErr
-		}
-	}
-
-	// Checkout a revision related to some experiment; the `defer` will reset
-	// the HEAD to what it was before we checked it out.
-	checkoutHandle, checkoutErr := bf.Checkout(revisionSha)
-	if checkoutErr != nil {
-		return checkoutErr
-	}
-	defer checkoutHandle.Dispose()
-
-	configureErr := bf.ConfigureBuild()
-	if configureErr != nil {
-		return configureErr
-	}
-
-	buildErr := bf.Build()
-	if buildErr != nil {
-		return buildErr
 	}
 
 	return nil

@@ -20,8 +20,6 @@ type Experiment struct {
 	BitFunnelSha     string            `yaml:"bitfunnel-commit-hash"`
 	LabBookVersion   string            `yaml:"lab-book-version"`
 	QueryLog         *QueryLog         `yaml:"query-log"`
-	ManifestFile     string            `yaml:"manifest-file"`
-	ScriptFile       string            `yaml:"script-file"`
 	Corpus           []*corpus.Chunk   `yaml:"corpus"`
 	Samples          []*Sample         `yaml:"samples"`
 	StatisticsConfig *StatisticsConfig `yaml:"statistics-config"`

@@ -25,6 +25,13 @@ func IsDir(path string) bool {
 	return true
 }
 
+// NormalizeSignature puts a signature string into canonical form.
+func NormalizeSignature(signature string) string {
+	return strings.ToLower(signature)
+}
+
+// TODO: Move ValidateSHA512 out of util and into file/lock.
+
 // ValidateSHA512 will hash a stream of bytes using a canonical SHA512
 // configuration, and validate that it matches a given SHA512 hash.
 func ValidateSHA512(stream []byte, SHA512 string) bool {

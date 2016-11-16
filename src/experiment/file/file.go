@@ -9,17 +9,33 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BitFunnel/LabBook/src/experiment/file/lock"
+	"github.com/BitFunnel/LabBook/src/schema"
 	"github.com/BitFunnel/LabBook/src/systems/fs"
 	"github.com/BitFunnel/LabBook/src/util"
 )
+
+// TODO: Change (m managerContext) to be (m *managerContext) in all of these
+// method recievers!
+
+const lockFileName = "LOCKFILE"
+
+// CacheOperation will perform some data processing step, and dump the results
+// in a set of files. Those filenames will then be return as absolute paths, so
+// that the filemanager can generate a signature to verify the cache.
+type CacheOperation func(sample *schema.Sample) ([]string, error)
 
 // Manager manages the lifecycle of the experiment files. This includes
 // fetching remote script and manifest files, writing them to the config, and
 // so on.
 type Manager interface {
-	CreateSampleDirectories() error
+	VerifySampleCache() error
+	CacheSamples(samples []*schema.Sample, createSamples CacheOperation) error
+
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
 	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
+
+	// Methods that return paths we can send to BitFunnel's shell commands.
 	GetConfigRoot() string
 	GetConfigManifestPath() string
 	GetSamplePath(sampleName string) (string, bool)
@@ -30,11 +46,6 @@ type Manager interface {
 // NewManager creates a new Manager object.
 func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) Manager {
 	configRoot := filepath.Join(experimentRoot, "configuration")
-	configManifestPath := filepath.Join(configRoot, "config_manifest.txt")
-	runtimeManifestPath := filepath.Join(configRoot, "runtime_manifest.txt")
-	scriptPath := filepath.Join(configRoot, "script.txt")
-	verifyOutPath := filepath.Join(experimentRoot, "verify_out")
-	noVerifyOutPath := filepath.Join(experimentRoot, "no_verify_out")
 	sampleRoot := filepath.Join(experimentRoot, "samples")
 
 	samplePaths := make(map[string]string, len(sampleNames))
@@ -47,11 +58,15 @@ func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) 
 		corpusRoot:          corpusRoot,
 		sampleRoot:          sampleRoot,
 		samplePaths:         samplePaths,
-		scriptPath:          scriptPath,
-		verifyOutPath:       verifyOutPath,
-		noVerifyOutPath:     noVerifyOutPath,
-		configManifestPath:  configManifestPath,
-		runtimeManifestPath: runtimeManifestPath,
+		scriptPath:          filepath.Join(configRoot, "script.txt"),
+		verifyOutPath:       filepath.Join(experimentRoot, "verify_out"),
+		noVerifyOutPath:     filepath.Join(experimentRoot, "no_verify_out"),
+		configManifestPath:  filepath.Join(configRoot, "config_manifest.txt"),
+		runtimeManifestPath: filepath.Join(configRoot, "runtime_manifest.txt"),
+		corpusLockfilePath:  filepath.Join(corpusRoot, lockFileName),
+		configLockfilePath:  filepath.Join(configRoot, lockFileName),
+		sampleLockfilePath:  filepath.Join(sampleRoot, lockFileName),
+		exptLockfilePath:    filepath.Join(experimentRoot, lockFileName),
 	}
 }
 
@@ -65,22 +80,82 @@ type managerContext struct {
 	noVerifyOutPath     string
 	configManifestPath  string
 	runtimeManifestPath string
+	corpusLockfilePath  string
+	configLockfilePath  string
+	sampleLockfilePath  string
+	exptLockfilePath    string
 }
 
-// CreateSampleDirectories will create the directories we'll need to generate
-// the filtered samples for an experiment. For example, if an experiment
-// defines 2 samples with names `sample1` and `sample2`, this will create
-// directories for each.
-func (m managerContext) CreateSampleDirectories() error {
-	for _, samplePath := range m.samplePaths {
-		mkdirFilteredCorpusRoot := fs.MkdirAll(samplePath, 0777)
-		if mkdirFilteredCorpusRoot != nil {
-			return fmt.Errorf("Unable to create filtered corpus directory "+
-				"'%s':\n%v", samplePath, mkdirFilteredCorpusRoot)
+func (m managerContext) VerifySampleCache() error {
+	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
+	if lockAcqErr != nil {
+		return lockAcqErr
+	}
+	defer m.releaseLockFile(&corpusLock)
+
+	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleLockfilePath)
+	if lockAcqErr != nil {
+		return lockAcqErr
+	}
+	defer m.releaseLockFile(&sampleLock)
+
+	return lock.ValidateSampleLockFile(corpusLock, sampleLock)
+}
+
+func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples CacheOperation) error {
+	// `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
+	// Then deserialize, return struct here. Rationale is: because we are not
+	// changing the corpus (or the corpus lock), we will always want put it
+	// back. It's not important that it's moved to .LOCKFILE, it just seems
+	// convenient.
+	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
+	if lockAcqErr != nil {
+		// This error should already explain the problem, e.g., if the
+		// .LOCKFILE exists and LOCKFILE does not.
+		return lockAcqErr
+	}
+	// Put the LOCKFILE back. We didn't touch the corpus, so we always want to
+	// put it back. This also ensures that we put the corpus file back after we
+	// write out the sample lock.
+	// NOTE: We need to figure out how to deal with the `error` that
+	// `ReleaseLock` returns. Probably name the `error` return parameter, and
+	// wrap this in a func that sets it in the case of error.
+	// TODO: Look at entire codebase for bad uses of `defer`.
+	defer m.releaseLockFile(&corpusLock)
+
+	// TODO: Probably want to acquire the locks of all samples.
+
+	// Attempt to acquire the LOCKFILE for samples. As above, this will either
+	// delete LOCKFILE or move it. This time we only want to write out a new
+	// LOCKFILE on success.
+	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleLockfilePath)
+	if lockAcqErr != nil {
+		return lockAcqErr
+	}
+
+	// Create Samples.
+	sampleDirErr := m.createSampleDirectories()
+	if sampleDirErr != nil {
+		return sampleDirErr
+	}
+
+	for _, sample := range samples {
+		sampleFiles, filterErr := createSamples(sample)
+		if filterErr != nil {
+			return filterErr
+		}
+
+		// TODO: Probably want to accumulate
+		_, signatureError := m.createSignature(sampleFiles)
+		if signatureError != nil {
+			return signatureError
 		}
 	}
 
-	return nil
+	// TODO: We need to set the sample signature, and release all of the locks.
+
+	// Write out lock only on success.
+	return m.releaseLockFile(&sampleLock)
 }
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
@@ -128,6 +203,11 @@ func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogU
 	return nil
 }
 
+//
+// PATH GETTER METHODS. These are typically passed to BitFunnel shell commands.
+// TODO: MOVE THESE TO THEIR OWN FILE.
+//
+
 // GetConfigRoot will get the path to the root of the directory that contains
 // configuration information for BitFunnel's runtime (e.g., files for the term
 // table, statistics, etc.)
@@ -165,6 +245,41 @@ func (m managerContext) GetSampleManifestPath(sampleName string) (string, bool) 
 func (m managerContext) GetScriptPath() string {
 	// TODO: Check that this was actually generated?
 	return m.scriptPath
+}
+
+//
+// PRIVATE METHODS.
+//
+
+func (m managerContext) acquireLockFile(corpusPath string) (lock.File, error) {
+	// TODO: This is a dummy implementation.
+	panic("Not implemented")
+}
+
+func (m managerContext) releaseLockFile(lock *lock.File) error {
+	// TODO: This is a dummy implementation.
+	panic("Not implemented")
+}
+
+func (m managerContext) createSignature(dataPaths []string) (string, error) {
+	// TODO: This is a dummy implementation.
+	panic("Not implemented")
+}
+
+// createSampleDirectories will create the directories we'll need to generate
+// the filtered samples for an experiment. For example, if an experiment
+// defines 2 samples with names `sample1` and `sample2`, this will create
+// directories for each.
+func (m managerContext) createSampleDirectories() error {
+	for _, samplePath := range m.samplePaths {
+		mkdirFilteredCorpusRoot := fs.MkdirAll(samplePath, 0777)
+		if mkdirFilteredCorpusRoot != nil {
+			return fmt.Errorf("Unable to create filtered corpus directory "+
+				"'%s':\n%v", samplePath, mkdirFilteredCorpusRoot)
+		}
+	}
+
+	return nil
 }
 
 func (m managerContext) writeScript(manifestPaths []string, queryLog []string) error {

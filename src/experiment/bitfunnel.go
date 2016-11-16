@@ -44,100 +44,27 @@ func buildBitFunnelAtRevision(bf bfrepo.Manager, revisionSha string) error {
 	return nil
 }
 
-func createSamples(repo bfrepo.Manager, fileManager file.Manager, schema *schema.Experiment) (string, error) {
-	// Create corpus samples.
-	sampleDirErr := fileManager.CreateSampleDirectories()
-	if sampleDirErr != nil {
-		return "", sampleDirErr
+func createSample(sample *schema.Sample, repo bfrepo.Manager, fileManager file.Manager) (string, error) {
+	// NOTE: The BitFunnel binary requires you to create the sample directories
+	// before calling the `filter` operation. This is handled for us in the
+	// `file.Manager.CacheSamples` method, but it is worth noting anyway.
+
+	samplePath, ok := fileManager.GetSamplePath(sample.Name)
+	if !ok {
+		return "", fmt.Errorf("Tried to create corpus sample for name '%s', "+
+			"but this name didn't appear in experiment schema",
+			sample.Name)
 	}
-	for _, sample := range schema.Samples {
-		samplePath, ok := fileManager.GetSamplePath(sample.Name)
-		if !ok {
-			return "", fmt.Errorf("Tried to create corpus sample for name '%s', "+
-				"but this name didn't appear in experiment schema",
-				sample.Name)
-		}
-		filterErr := repo.RunFilter(
-			fileManager.GetConfigManifestPath(),
-			samplePath,
-			sample.AsFilterArg())
-		if filterErr != nil {
-			return "", filterErr
-		}
-	}
-
-	// TODO: Generate signature for the sample.
-
-	return "", nil
-}
-
-// We need:
-// * To be able to cache the samples.
-//
-// We need:
-// * An operation to perform
-// * A way to communicate if getting current lock was successful.
-// * A set of files to generate signatures from.
-
-func verifySamples() error {
-	corpusLock, lockAcqErr := fileManager.AcquireCorpusLock()
-	if lockAcqErr != nil {
-		// This error should already explain the problem, e.g., if the
-		// .LOCKFILE exists and LOCKFILE does not.
-		return lockAcqErr
-	}
-	defer fileManager.ReleaseLock(corpusLock)
-
-	sampleLock, lockAcqErr := fileManager.AcquireSampleLock()
-	if lockAcqErr != nil {
-		return lockAcqErr
-	}
-
-	validationErr := ValidateSampleLockFile(corpusLock, sampleLock)
-	if validationErr != nil {
-		return validationErr
-	}
-}
-
-func cacheSamples(fileManager file.Manager) error {
-	// `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
-	// Then deserialize, return struct here. Rationale is: because we are not
-	// changing the corpus (or the corpus lock), we will always want put it
-	// back. It's not important that it's moved to .LOCKFILE, it just seems
-	// convenient.
-	corpusLock, lockAcqErr := fileManager.AcquireCorpusLock()
-	if lockAcqErr != nil {
-		// This error should already explain the problem, e.g., if the
-		// .LOCKFILE exists and LOCKFILE does not.
-		return lockAcqErr
-	}
-	// Put the LOCKFILE back. We didn't touch the corpus, so we always want to
-	// put it back. This also ensures that we put the corpus file back after we
-	// write out the sample lock.
-	// NOTE: We need to figure out how to deal with the `error` that
-	// `ReleaseLock` returns. Probably name the `error` return parameter, and
-	// wrap this in a func that sets it in the case of error.
-	defer fileManager.ReleaseLock(corpusLock)
-
-	// Attempt to acquire the LOCKFILE for samples. As above, this will either
-	// delete LOCKFILE or move it. This time we only want to write out a new
-	// LOCKFILE on success.
-	// NOTE: We might need a second API, one to handle the case that a lock
-	// does not exist.
-	sampleLock, lockAcqErr := fileManager.AcquireSampleLock()
-	if lockAcqErr != nil {
-		return lockAcqErr
-	}
-
-	// Create Samples.
-	sampleSignature, filterErr := createSamples()
+	filterErr := repo.RunFilter(
+		fileManager.GetConfigManifestPath(),
+		samplePath,
+		sample.AsFilterArg())
 	if filterErr != nil {
-		return filterErr
+		return "", filterErr
 	}
 
-	// Write out lock only on success.
-	sampleLock.Signature = sampleSignature
-	return fileManager.ReleaseLock(sampleLock)
+	// TODO: Parse the resulting manifest file for sample.
+	return "", nil
 }
 
 // QUESTIONS:
@@ -168,10 +95,12 @@ func cacheSamples(fileManager file.Manager) error {
 
 func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, schema *schema.Experiment) error {
 	// Create corpus samples.
-	sampleDirErr := fileManager.CreateSampleDirectories()
-	if sampleDirErr != nil {
-		return sampleDirErr
-	}
+
+	// TODO: We need to un-comment this if it's going to work.
+	// sampleDirErr := fileManager.CreateSampleDirectories()
+	// if sampleDirErr != nil {
+	// 	return sampleDirErr
+	// }
 	for _, sample := range schema.Samples {
 		samplePath, ok := fileManager.GetSamplePath(sample.Name)
 		if !ok {

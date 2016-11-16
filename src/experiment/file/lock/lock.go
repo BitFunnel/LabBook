@@ -14,6 +14,8 @@ const corpusKey = "corpus-signature"
 const sampleKey = "sample-signature"
 const configKey = "config-signature"
 
+// TODO: Replace uses of `File` with `Manager` instead.
+
 // Manager is a general interface for managing all the information we need to
 // verify that a cached dataset is the dataset we ran an experiment on. In
 // particular, it contains a signature for any dependency steps, as well as a

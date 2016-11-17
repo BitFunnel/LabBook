@@ -11,6 +11,7 @@ import (
 
 	"github.com/BitFunnel/LabBook/src/experiment/file/lock"
 	"github.com/BitFunnel/LabBook/src/schema"
+	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/BitFunnel/LabBook/src/systems/fs"
 	"github.com/BitFunnel/LabBook/src/util"
 )
@@ -29,9 +30,13 @@ type CacheCorpusOperation func() (signature string, decompressErr error)
 
 // CacheSampleOperation represents the operation of generating a cachable
 // sample of a corpus. The function should take a schema describing the sample
-// to generate, and runs BitFunnel's `filter` command. The result is a set of
-// filenames which the `file.Manager` can then open up to obtain a signature.
-type CacheSampleOperation func(sample *schema.Sample) ([]string, error)
+// to generate, and runs BitFunnel's `filter` command, returning an error as
+// appropriate.
+type CacheSampleOperation func(
+	sample *schema.Sample,
+	corpusManifestPath string,
+	outputPath string,
+) error
 
 // Manager manages the lifecycle of the experiment files. This includes
 // fetching remote script and manifest files, writing them to the config, and
@@ -42,8 +47,8 @@ type Manager interface {
 	InitDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error
 	UpdateDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error
 
-	InitSampleCache(samples []*schema.Sample, createSamples CacheSampleOperation) error
-	// UpdateSampleCache(samples []*schema.Sample, createSamples CacheSampleOperation) error
+	InitSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error
+	UpdateSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error
 	VerifySampleCache() error
 
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
@@ -152,60 +157,130 @@ func (m managerContext) VerifySampleCache() error {
 	return lock.ValidateSampleLockFile(corpusLock, sampleLock)
 }
 
-func (m managerContext) InitSampleCache(samples []*schema.Sample, createSamples CacheSampleOperation) error {
-	// `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
-	// Then deserialize, return struct here. Rationale is: because we are not
-	// changing the corpus (or the corpus lock), we will always want put it
-	// back. It's not important that it's moved to .LOCKFILE, it just seems
-	// convenient.
+func (m managerContext) InitSampleCache(
+	samples []*schema.Sample,
+	createSample CacheSampleOperation,
+) error {
+	// TODO: Consider erroring out if we haven't called the corpus init
+	// routines.
+
 	corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
 	if lockAcqErr != nil {
-		// This error should already explain the problem, e.g., if the
-		// .LOCKFILE exists and LOCKFILE does not.
 		return lockAcqErr
 	}
-	// Put the LOCKFILE back. We didn't touch the corpus, so we always want to
-	// put it back. This also ensures that we put the corpus file back after we
-	// write out the sample lock.
-	// NOTE: We need to figure out how to deal with the `error` that
-	// `ReleaseLock` returns. Probably name the `error` return parameter, and
-	// wrap this in a func that sets it in the case of error.
-	// TODO: Look at entire codebase for bad uses of `defer`.
 	defer m.releaseLockFile(m.experimentRoot, corpusLock)
 
-	// TODO: Probably want to acquire the locks of all samples.
-
-	// Attempt to acquire the LOCKFILE for samples. As above, this will either
-	// delete LOCKFILE or move it. This time we only want to write out a new
-	// LOCKFILE on success.
-	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleRoot)
-	if lockAcqErr != nil {
-		return lockAcqErr
-	}
-
-	// Create Samples.
+	// The BitFunnel executable does not create directories as part of its
+	// `filter` operation, so we create sample directoreis on its behalf.
 	sampleDirErr := m.createSampleDirectories()
 	if sampleDirErr != nil {
 		return sampleDirErr
 	}
 
+	// Create corpus samples, write a lock file for each.
 	for _, sample := range samples {
-		sampleFiles, filterErr := createSamples(sample)
+		samplePath, ok := m.GetSamplePath(sample.Name)
+		if !ok {
+			return fmt.Errorf("Tried to create corpus sample for name '%s', "+
+				"but this name didn't appear in experiment schema",
+				sample.Name)
+		}
+
+		filterErr := createSample(sample, m.configManifestPath, samplePath)
 		if filterErr != nil {
 			return filterErr
 		}
 
-		// TODO: Probably want to accumulate
-		_, signatureError := m.createSignature(sampleFiles)
+		// TODO: This is gross and could probably be merged into the
+		// conditional above.
+		sampleManifestPath, ok := m.GetSampleManifestPath(sample.Name)
+		if !ok {
+			return fmt.Errorf("Tried to create corpus sample for name '%s', "+
+				"but this name didn't appear in experiment schema",
+				sample.Name)
+		}
+
+		sampleFiles, readErr := readFileLines(sampleManifestPath)
+		if readErr != nil {
+			return readErr
+		}
+
+		sampleSignature, signatureError := m.createSignature(sampleFiles)
 		if signatureError != nil {
 			return signatureError
 		}
+
+		// Create and write out a lockfile for the sample.
+		sampleLockPath := filepath.Join(samplePath, lockFileName)
+		sampleLock := lock.NewSampleLockFile(
+			sampleLockPath,
+			sampleSignature,
+			corpusLock.Signature())
+
+		writeErr := m.writeLockFile(sampleLockPath, sampleLock)
+		if writeErr != nil {
+			return writeErr
+		}
 	}
 
-	// TODO: We need to set the sample signature, and release all of the locks.
+	return nil
+}
 
-	// Write out lock only on success.
-	return m.releaseLockFile(m.sampleRoot, sampleLock)
+func (m managerContext) UpdateSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error {
+	return nil
+	// // `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
+	// // Then deserialize, return struct here. Rationale is: because we are not
+	// // changing the corpus (or the corpus lock), we will always want put it
+	// // back. It's not important that it's moved to .LOCKFILE, it just seems
+	// // convenient.
+	// corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
+	// if lockAcqErr != nil {
+	// 	// This error should already explain the problem, e.g., if the
+	// 	// .LOCKFILE exists and LOCKFILE does not.
+	// 	return lockAcqErr
+	// }
+	// // Put the LOCKFILE back. We didn't touch the corpus, so we always want to
+	// // put it back. This also ensures that we put the corpus file back after we
+	// // write out the sample lock.
+	// // NOTE: We need to figure out how to deal with the `error` that
+	// // `ReleaseLock` returns. Probably name the `error` return parameter, and
+	// // wrap this in a func that sets it in the case of error.
+	// // TODO: Look at entire codebase for bad uses of `defer`.
+	// defer m.releaseLockFile(m.experimentRoot, corpusLock)
+
+	// // TODO: Probably want to acquire the locks of all samples.
+
+	// // Attempt to acquire the LOCKFILE for samples. As above, this will either
+	// // delete LOCKFILE or move it. This time we only want to write out a new
+	// // LOCKFILE on success.
+	// sampleLock, lockAcqErr := m.acquireLockFile(m.sampleRoot)
+	// if lockAcqErr != nil {
+	// 	return lockAcqErr
+	// }
+
+	// // Create Samples.
+	// sampleDirErr := m.createSampleDirectories()
+	// if sampleDirErr != nil {
+	// 	return sampleDirErr
+	// }
+
+	// for _, sample := range samples {
+	// 	sampleFiles, filterErr := createSample(sample)
+	// 	if filterErr != nil {
+	// 		return filterErr
+	// 	}
+
+	// 	// TODO: Probably want to accumulate
+	// 	_, signatureError := m.createSignature(sampleFiles)
+	// 	if signatureError != nil {
+	// 		return signatureError
+	// 	}
+	// }
+
+	// // TODO: We need to set the sample signature, and release all of the locks.
+
+	// // Write out lock only on success.
+	// return m.releaseLockFile(m.sampleRoot, sampleLock)
 }
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
@@ -312,7 +387,7 @@ func (m managerContext) acquireLockFile(
 	// whichever process does not error out during this call can safely
 	// proceed.
 
-	linkErr := os.Link(lockPath, tmpLockPath)
+	linkErr := fs.Link(lockPath, tmpLockPath)
 	if linkErr != nil {
 		if os.IsNotExist(linkErr) {
 			return nil, sourceDoesNotExistError(lockPath)
@@ -323,7 +398,7 @@ func (m managerContext) acquireLockFile(
 		}
 	}
 
-	removeErr := os.Remove(lockPath)
+	removeErr := fs.Remove(lockPath)
 	if removeErr != nil {
 		return nil, couldNotRemoveSourceError(lockPath, removeErr)
 	}
@@ -348,7 +423,7 @@ func (m managerContext) releaseLockFile(
 		return writeErr
 	}
 
-	linkErr := os.Link(tmpLockPath, lockPath)
+	linkErr := fs.Link(tmpLockPath, lockPath)
 	if linkErr != nil {
 		if os.IsNotExist(linkErr) {
 			// return sourceDoesNotExistError(lockPath)
@@ -362,7 +437,7 @@ func (m managerContext) releaseLockFile(
 		}
 	}
 
-	removeErr := os.Remove(tmpLockPath)
+	removeErr := fs.Remove(tmpLockPath)
 	if removeErr != nil {
 		// return couldNotRemoveSourceError(lockPath, removeErr)
 		return fmt.Errorf("Attempted to to release lock file, but we could not remove '%s' (this should not happen, please file a bug):\n%v", tmpLockPath, linkErr)
@@ -372,8 +447,34 @@ func (m managerContext) releaseLockFile(
 }
 
 func (m managerContext) createSignature(dataPaths []string) (string, error) {
-	// TODO: This is a dummy implementation.
-	panic("Not implemented")
+	signatureAccumulator := signature.NewSampleSignatureAccumulator()
+	for _, path := range dataPaths {
+		if path == "" {
+			continue
+		}
+
+		// TODO: Probably we want to move this to some method.
+
+		// Get content.
+		file, openErr := fs.Open(path)
+		if openErr != nil {
+			return "", fmt.Errorf("Attempted to create signature for data, but failed to open path '%s':\n%v", path, openErr)
+		}
+		defer file.Close()
+
+		fileBytes, readErr := ioutil.ReadAll(file)
+		if readErr != nil {
+			return "", fmt.Errorf("Attempted to create signature for data, but failed to read file at path '%s':\n%v", path, readErr)
+		}
+
+		// Add content to signature.
+		_, sigErr := signatureAccumulator.AddSampleData(fileBytes)
+		if sigErr != nil {
+			return "", sigErr
+		}
+	}
+
+	return signatureAccumulator.Signature()
 }
 
 // createSampleDirectories will create the directories we'll need to generate
@@ -407,6 +508,8 @@ func (m managerContext) writeLockFile(
 		// TODO: Consider deleting the lockfile if we can't write to it.
 		return fmt.Errorf("Attempt to serialize and write lock file '%s' failed:\n%v ", lockPath, serializeErr)
 	}
+	// TODO: Verify that other calls to `Create` use this as well.
+	lockFileData.Sync()
 
 	return nil
 }

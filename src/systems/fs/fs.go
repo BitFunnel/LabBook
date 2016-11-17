@@ -33,6 +33,30 @@ func Open(name string) (*os.File, error) {
 	return os.Open(name)
 }
 
+// Remove is a mockable wrapper for `os.Remove`.
+func Remove(name string) error {
+	if systems.IsDryRun() {
+		operationText := fmt.Sprintf(`os.Remove("%s")`, name)
+		systems.OpLog().Log(newFsOperation(operationText))
+
+		// TODO: Figure out the semantics of the dry run here.
+	}
+
+	return os.Remove(name)
+}
+
+// Link is a mockable wrapper for `os.Link`.
+func Link(oldname, newname string) error {
+	if systems.IsDryRun() {
+		operationText := fmt.Sprintf(`os.Link("%s", "%s")`, oldname, newname)
+		systems.OpLog().Log(newFsOperation(operationText))
+
+		// TODO: Figure out the semantics of the dry run here.
+	}
+
+	return os.Link(oldname, newname)
+}
+
 // ScopedChdir changes to `directory` and then, when `Dispose` is
 // called, it changes back to the current working directory.
 func ScopedChdir(directory string) (shell.CmdHandle, error) {

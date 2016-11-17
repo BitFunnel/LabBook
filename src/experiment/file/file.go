@@ -19,12 +19,13 @@ import (
 // method recievers!
 
 const lockFileName = "LOCKFILE"
+const tmpLockFileName = ".LOCKFILE"
 
 // CacheCorpusOperation represents a cachable corpus decompression operation.
 // When the corpus is decompressed, this function should generate a signature
 // for all the data in the corpus, and return it. We can then later use this
 // signature to verify that the data in the corpus is what we think it is.
-type CacheCorpusOperation func() (string, error)
+type CacheCorpusOperation func() (signature string, decompressErr error)
 
 // CacheSampleOperation represents the operation of generating a cachable
 // sample of a corpus. The function should take a schema describing the sample
@@ -72,10 +73,6 @@ func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) 
 		noVerifyOutPath:     filepath.Join(experimentRoot, "no_verify_out"),
 		configManifestPath:  filepath.Join(configRoot, "config_manifest.txt"),
 		runtimeManifestPath: filepath.Join(configRoot, "runtime_manifest.txt"),
-		corpusLockfilePath:  filepath.Join(corpusRoot, lockFileName),
-		configLockfilePath:  filepath.Join(configRoot, lockFileName),
-		sampleLockfilePath:  filepath.Join(sampleRoot, lockFileName),
-		exptLockfilePath:    filepath.Join(experimentRoot, lockFileName),
 	}
 }
 
@@ -89,40 +86,37 @@ type managerContext struct {
 	noVerifyOutPath     string
 	configManifestPath  string
 	runtimeManifestPath string
-	corpusLockfilePath  string
-	configLockfilePath  string
-	sampleLockfilePath  string
-	exptLockfilePath    string
 }
 
 func (m managerContext) CacheDecompressedCorpus(decompressCorpus CacheCorpusOperation) error {
-	_, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
+	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
 
-	_, decompressErr := decompressCorpus()
+	corpusSignature, decompressErr := decompressCorpus()
 	if decompressErr != nil {
 		return decompressErr
 	}
 
-	// TODO: Set signature with corpus lock.
+	corpusLock.UpdateSignature(corpusSignature)
 
-	return nil
+	// Release the lock file if and only if we're successful with the above.
+	return m.releaseLockFile(m.corpusRoot, corpusLock)
 }
 
 func (m managerContext) VerifySampleCache() error {
-	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
+	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
-	defer m.releaseLockFile(corpusLock)
+	defer m.releaseLockFile(m.corpusRoot, corpusLock)
 
-	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleLockfilePath)
+	sampleLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
-	defer m.releaseLockFile(sampleLock)
+	defer m.releaseLockFile(m.corpusRoot, sampleLock)
 
 	return lock.ValidateSampleLockFile(corpusLock, sampleLock)
 }
@@ -133,7 +127,7 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// changing the corpus (or the corpus lock), we will always want put it
 	// back. It's not important that it's moved to .LOCKFILE, it just seems
 	// convenient.
-	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
+	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
 	if lockAcqErr != nil {
 		// This error should already explain the problem, e.g., if the
 		// .LOCKFILE exists and LOCKFILE does not.
@@ -146,14 +140,14 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// `ReleaseLock` returns. Probably name the `error` return parameter, and
 	// wrap this in a func that sets it in the case of error.
 	// TODO: Look at entire codebase for bad uses of `defer`.
-	defer m.releaseLockFile(corpusLock)
+	defer m.releaseLockFile(m.corpusRoot, corpusLock)
 
 	// TODO: Probably want to acquire the locks of all samples.
 
 	// Attempt to acquire the LOCKFILE for samples. As above, this will either
 	// delete LOCKFILE or move it. This time we only want to write out a new
 	// LOCKFILE on success.
-	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleLockfilePath)
+	sampleLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
@@ -180,7 +174,7 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// TODO: We need to set the sample signature, and release all of the locks.
 
 	// Write out lock only on success.
-	return m.releaseLockFile(sampleLock)
+	return m.releaseLockFile(m.corpusRoot, sampleLock)
 }
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
@@ -276,14 +270,87 @@ func (m managerContext) GetScriptPath() string {
 // PRIVATE METHODS.
 //
 
-func (m managerContext) acquireLockFile(corpusPath string) (lock.Manager, error) {
-	// TODO: This is a dummy implementation.
-	panic("Not implemented")
+func (m managerContext) acquireLockFile(
+	directory string,
+) (lock.Manager, error) {
+	lockPath := filepath.Join(directory, lockFileName)
+	tmpLockPath := filepath.Join(directory, tmpLockFileName)
+
+	// Attempt to atomically acquire the lock by creating a hard link from
+	// `LOCKFILE` to `.LOCKFILE`. Only one process can create the hard link, so
+	// whichever process does not error out during this call can safely
+	// proceed.
+
+	linkErr := os.Link(lockPath, tmpLockPath)
+	if linkErr != nil {
+		if os.IsNotExist(linkErr) {
+			return nil, sourceDoesNotExistError(lockPath)
+		} else if os.IsExist(linkErr) {
+			return nil, destinationExistsError(tmpLockPath)
+		} else {
+			return nil, unknownLockError(lockPath, linkErr)
+		}
+	}
+
+	removeErr := os.Remove(lockPath)
+	if removeErr != nil {
+		return nil, couldNotRemoveSourceError(lockPath, removeErr)
+	}
+
+	lockFileData, readErr := fs.Open(tmpLockPath)
+	if readErr != nil {
+		return nil, fmt.Errorf("Attempted to acquire lock, but could not read from file '%s'", tmpLockPath)
+	}
+	defer lockFileData.Close()
+
+	lockFile, deserErr := lock.DeserializeLockFile(lockFileData, tmpLockPath)
+	if deserErr != nil {
+		return nil, fmt.Errorf("Attempted to acquire lock, but could not read from file '%s'", tmpLockPath)
+	}
+
+	return lockFile, nil
 }
 
-func (m managerContext) releaseLockFile(lock lock.Manager) error {
-	// TODO: This is a dummy implementation.
-	panic("Not implemented")
+func (m managerContext) releaseLockFile(
+	directory string,
+	lockFile lock.Manager,
+) error {
+	lockPath := filepath.Join(directory, lockFileName)
+	tmpLockPath := filepath.Join(directory, tmpLockFileName)
+
+	lockFileData, readErr := fs.Create(tmpLockPath)
+	if readErr != nil {
+		return fmt.Errorf("Attempted to release lock file, but could not read from file '%s':\n%v", tmpLockPath, readErr)
+	}
+	defer lockFileData.Close()
+
+	serializeErr := lock.SerializeLockFile(lockFile, lockFileData)
+	if serializeErr != nil {
+		// TODO: Consider deleting the lockfile if we can't write to it.
+		return fmt.Errorf("Attempted to release lock file, but could not write data to lock file at '%s'; ", tmpLockPath)
+	}
+
+	linkErr := os.Link(tmpLockPath, lockPath)
+	if linkErr != nil {
+		if os.IsNotExist(linkErr) {
+			// return sourceDoesNotExistError(lockPath)
+			return fmt.Errorf("Attempted to to release lock file, but '%s' does not exist (this should not happen, please file a bug)", tmpLockPath)
+		} else if os.IsExist(linkErr) {
+			// return destinationExistsError(tmpLockPath)
+			return fmt.Errorf("Attempted to to release lock file, but '%s' already exists (this should not happen, please file a bug)", lockPath)
+		} else {
+			// return unknownLockError(lockPath, linkErr)
+			return fmt.Errorf("Attempted to to release lock file at '%s', but unknown error happened (this should not happen, please file a bug):\n%v", tmpLockPath, linkErr)
+		}
+	}
+
+	removeErr := os.Remove(tmpLockPath)
+	if removeErr != nil {
+		// return couldNotRemoveSourceError(lockPath, removeErr)
+		return fmt.Errorf("Attempted to to release lock file, but we could not remove '%s' (this should not happen, please file a bug):\n%v", tmpLockPath, linkErr)
+	}
+
+	return nil
 }
 
 func (m managerContext) createSignature(dataPaths []string) (string, error) {
@@ -396,6 +463,10 @@ func (m managerContext) writeQueriesToScript(w *os.File, queryLog []string, veri
 
 	return nil
 }
+
+//
+// PRIVATE FUNCTIONS.
+//
 
 // TODO: Make this an actual URL.
 func fetchFileLines(url string, validationSHA512 string) ([]string, error) {

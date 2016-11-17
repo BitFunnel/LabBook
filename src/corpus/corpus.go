@@ -29,6 +29,8 @@ func NewManager(chunks []*Chunk, corpusRoot string) Manager {
 	}
 }
 
+// TODO: Rename `Uncompress` -> `Decompress`.
+
 // Uncompress will uncompress the corpus files that `ctx` is responsible for
 // managing.
 func (ctx *corpusContext) Uncompress() error {
@@ -88,6 +90,8 @@ func (ctx *corpusContext) Uncompress() error {
 
 // GetAllCorpusFilepaths returns the absolute path of every file in the corpus.
 func (ctx *corpusContext) GetAllCorpusFilepaths() ([]string, error) {
+	// TODO: Consider making chunk files have a `.chunk` suffix to simplify
+	// this.
 	if !ctx.uncompressed {
 		return []string{}, fmt.Errorf("Can't get paths of corpus files "+
 			"rooted at '%s', since they haven't been uncompressed yet",

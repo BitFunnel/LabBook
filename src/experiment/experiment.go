@@ -135,6 +135,14 @@ func (expt *experimentContext) Run() error {
 	return nil
 }
 
+//
+// PRIVATE FUNCTIONS.
+//
+
+func decompressCorpus() error {
+	return nil
+}
+
 func sampleNames(samples []*schema.Sample) []string {
 	var names = make([]string, len(samples))
 	for index, sample := range samples {

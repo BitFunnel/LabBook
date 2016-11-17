@@ -15,12 +15,12 @@ func Test_SimpleLockRoundTrip(t *testing.T) {
 		"simpleCorpusLockFileData")
 	assert.NoError(t, deserializeErr)
 
-	assert.Equal(t, corpusLockFile.Signature, lockFile.Signature)
-	assert.Equal(t, 1, len(lockFile.DependencySignatures))
+	assert.Equal(t, corpusLockFile.Signature(), lockFile.Signature())
+	assert.Equal(t, 1, len(lockFile.DependencySignatures()))
 	assert.Equal(
 		t,
-		corpusLockFile.DependencySignatures[simpleCorpusTarball],
-		lockFile.DependencySignatures[simpleCorpusTarball])
+		corpusLockFile.DependencySignatures()[simpleCorpusTarball],
+		lockFile.DependencySignatures()[simpleCorpusTarball])
 
 	var serializedBuffer bytes.Buffer
 	serializeErr := SerializeLockFile(lockFile, &serializedBuffer)
@@ -30,113 +30,113 @@ func Test_SimpleLockRoundTrip(t *testing.T) {
 
 func Test_SimpleValidate(t *testing.T) {
 	validationErr :=
-		ValidateSampleLockFile(corpusLockFile, sampleLockFile)
+		ValidateSampleLockFile(&corpusLockFile, &sampleLockFile)
 	assert.NoError(t, validationErr)
 
 	validationErr =
-		ValidateConfigLockFile(sampleLockFile, configLockFile)
+		ValidateConfigLockFile(&sampleLockFile, &configLockFile)
 	assert.NoError(t, validationErr)
 
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFile,
-		configLockFile,
-		experimentLockFile)
+		&sampleLockFile,
+		&configLockFile,
+		&experimentLockFile)
 	assert.NoError(t, validationErr)
 }
 
 func Test_DirectValidation(t *testing.T) {
 	validationErr := validateDependency(
-		sampleLockFileEmptyDep,
-		corpusLockFileEmptySig,
+		&sampleLockFileEmptyDep,
+		&corpusLockFileEmptySig,
 		corpusKey)
 	assert.Error(t, validationErr)
 }
 
 func Test_SimpleValidateFail(t *testing.T) {
 	validationErr :=
-		ValidateSampleLockFile(File{}, File{})
+		ValidateSampleLockFile(&File{}, &File{})
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateSampleLockFile(corpusLockFile, File{})
+		ValidateSampleLockFile(&corpusLockFile, &File{})
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateSampleLockFile(File{}, sampleLockFile)
+		ValidateSampleLockFile(&File{}, &sampleLockFile)
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateSampleLockFile(sampleLockFile, corpusLockFile)
+		ValidateSampleLockFile(&sampleLockFile, &corpusLockFile)
 	assert.Error(t, validationErr)
 
 	validationErr =
-		ValidateConfigLockFile(File{}, File{})
+		ValidateConfigLockFile(&File{}, &File{})
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateConfigLockFile(sampleLockFile, File{})
+		ValidateConfigLockFile(&sampleLockFile, &File{})
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateConfigLockFile(File{}, configLockFile)
+		ValidateConfigLockFile(&File{}, &configLockFile)
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateConfigLockFile(configLockFile, sampleLockFile)
+		ValidateConfigLockFile(&configLockFile, &sampleLockFile)
 	assert.Error(t, validationErr)
 
-	validationErr = ValidateExperimentLockFile(File{}, File{}, File{})
+	validationErr = ValidateExperimentLockFile(&File{}, &File{}, &File{})
 	assert.Error(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		File{},
-		configLockFile,
-		experimentLockFile)
+		&File{},
+		&configLockFile,
+		&experimentLockFile)
 	assert.Error(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFile,
-		File{},
-		experimentLockFile)
+		&sampleLockFile,
+		&File{},
+		&experimentLockFile)
 	assert.Error(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFile,
-		configLockFile,
-		File{})
+		&sampleLockFile,
+		&configLockFile,
+		&File{})
 	assert.Error(t, validationErr)
 }
 
 func Test_ComplexValidateFail(t *testing.T) {
 	validationErr :=
-		ValidateSampleLockFile(corpusLockFile, sampleLockFileBrokenDep)
+		ValidateSampleLockFile(&corpusLockFile, &sampleLockFileBrokenDep)
 	assert.Error(t, validationErr)
 
 	validationErr =
-		ValidateConfigLockFile(sampleLockFile, configLockFile)
+		ValidateConfigLockFile(&sampleLockFile, &configLockFile)
 	assert.NoError(t, validationErr)
 	validationErr =
-		ValidateConfigLockFile(sampleLockFileBrokenSig, configLockFile)
+		ValidateConfigLockFile(&sampleLockFileBrokenSig, &configLockFile)
 	assert.Error(t, validationErr)
 	validationErr =
-		ValidateConfigLockFile(sampleLockFile, configLockFileBrokenDep)
+		ValidateConfigLockFile(&sampleLockFile, &configLockFileBrokenDep)
 	assert.Error(t, validationErr)
 
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFileBrokenDep,
-		configLockFileBrokenDep,
-		experimentLockFile)
+		&sampleLockFileBrokenDep,
+		&configLockFileBrokenDep,
+		&experimentLockFile)
 	assert.NoError(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFileBrokenSig,
-		configLockFile,
-		experimentLockFile)
+		&sampleLockFileBrokenSig,
+		&configLockFile,
+		&experimentLockFile)
 	assert.Error(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFile,
-		configLockFileBrokenSig,
-		experimentLockFile)
+		&sampleLockFile,
+		&configLockFileBrokenSig,
+		&experimentLockFile)
 	assert.Error(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFile,
-		configLockFile,
-		experimentLockFileBrokenDep1)
+		&sampleLockFile,
+		&configLockFile,
+		&experimentLockFileBrokenDep1)
 	assert.Error(t, validationErr)
 	validationErr = ValidateExperimentLockFile(
-		sampleLockFile,
-		configLockFile,
-		experimentLockFileBrokenDep2)
+		&sampleLockFile,
+		&configLockFile,
+		&experimentLockFileBrokenDep2)
 	assert.Error(t, validationErr)
 }
 
@@ -154,79 +154,79 @@ const simpleConfigSignature = "3a5df945fb20b1675a5bcf0e7b882c6e22e0262f67a96e684
 const simpleSampleSignature = "b8244d028981d693af7b456af8efa4cad63d282e19ff14942c246e50d9351d22704a802a71c3580b6370de4ceb293c324a8423342557d4e5c38438f0e36910ee"
 
 var corpusLockFile = File{
-	Signature: simpleCorpusSignature,
-	DependencySignatures: map[string]string{
+	Signature_: simpleCorpusSignature,
+	DependencySignatures_: map[string]string{
 		simpleCorpusTarball: simpleCorpusTarballSignature,
 	},
 }
 var corpusLockFileEmptySig = File{
-	Signature: "",
-	DependencySignatures: map[string]string{
+	Signature_: "",
+	DependencySignatures_: map[string]string{
 		simpleCorpusTarball: simpleCorpusTarballSignature,
 	},
 }
 
 var sampleLockFile = File{
-	Signature: simpleSampleSignature,
-	DependencySignatures: map[string]string{
+	Signature_: simpleSampleSignature,
+	DependencySignatures_: map[string]string{
 		corpusKey: simpleCorpusSignature,
 	},
 }
 var sampleLockFileBrokenDep = File{
-	Signature: simpleSampleSignature,
-	DependencySignatures: map[string]string{
+	Signature_: simpleSampleSignature,
+	DependencySignatures_: map[string]string{
 		corpusKey: simpleCorpusSignature[5:],
 	},
 }
 var sampleLockFileBrokenSig = File{
-	Signature: simpleSampleSignature[5:],
-	DependencySignatures: map[string]string{
+	Signature_: simpleSampleSignature[5:],
+	DependencySignatures_: map[string]string{
 		corpusKey: simpleCorpusSignature,
 	},
 }
 var sampleLockFileEmptyDep = File{
-	Signature: simpleSampleSignature,
-	DependencySignatures: map[string]string{
+	Signature_: simpleSampleSignature,
+	DependencySignatures_: map[string]string{
 		corpusKey: "",
 	},
 }
 
 var configLockFile = File{
-	Signature: simpleConfigSignature,
-	DependencySignatures: map[string]string{
+	Signature_: simpleConfigSignature,
+	DependencySignatures_: map[string]string{
 		sampleKey: simpleSampleSignature,
 	},
 }
 var configLockFileBrokenDep = File{
-	Signature: simpleConfigSignature,
-	DependencySignatures: map[string]string{
+	Signature_: simpleConfigSignature,
+	DependencySignatures_: map[string]string{
 		sampleKey: simpleSampleSignature[5:],
 	},
 }
 var configLockFileBrokenSig = File{
-	Signature: simpleConfigSignature[5:],
-	DependencySignatures: map[string]string{
+	Signature_: simpleConfigSignature[5:],
+	DependencySignatures_: map[string]string{
 		sampleKey: simpleSampleSignature,
 	},
 }
 
 var experimentLockFile = File{
-	Signature: "",
-	DependencySignatures: map[string]string{
+	Signature_: "",
+	DependencySignatures_: map[string]string{
 		sampleKey: simpleSampleSignature,
 		configKey: simpleConfigSignature,
 	},
 }
 var experimentLockFileBrokenDep1 = File{
-	Signature: "",
-	DependencySignatures: map[string]string{
+	Signature_: "",
+	DependencySignatures_: map[string]string{
 		sampleKey: simpleSampleSignature[5:],
 		configKey: simpleConfigSignature,
 	},
 }
 var experimentLockFileBrokenDep2 = File{
-	Signature: "",
-	DependencySignatures: map[string]string{
+	Signature_: "",
+	DependencySignatures_: map[string]string{
 		sampleKey: simpleSampleSignature,
 		configKey: simpleConfigSignature[5:],
 	},
@@ -237,5 +237,5 @@ var simpleCorpusLockFileData = fmt.Sprintf(`dependency-signatures:
 signature: %s
 `,
 	simpleCorpusTarball,
-	corpusLockFile.DependencySignatures[simpleCorpusTarball],
-	corpusLockFile.Signature)
+	corpusLockFile.DependencySignatures()[simpleCorpusTarball],
+	corpusLockFile.Signature())

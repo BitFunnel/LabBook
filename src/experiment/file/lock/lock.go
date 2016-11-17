@@ -26,6 +26,8 @@ const configKey = "config-signature"
 type Manager interface {
 	DependencySignatures() map[string]string
 	Signature() string
+	UpdateSignature(signature string)
+	Name() string
 	IsLocked() bool
 }
 
@@ -52,35 +54,67 @@ type Manager interface {
 // interface, that centers around a YAML specification that can be serialized
 // deserialized to and from disk.
 type File struct {
-	DependencySignatures map[string]string `yaml:"dependency-signatures"`
-	Signature            string            `yaml:"signature"`
-	name                 string
-	isLocked             bool
+	DependencySignatures_ map[string]string `yaml:"dependency-signatures"`
+	Signature_            string            `yaml:"signature"`
+	name                  string
+	isLocked              bool
+}
+
+// DependencySignatures returns a map containing all dependencies of the
+// resource being locked, and their signatures. What the keys are depends on
+// the context, and should be largly opaque, as it's not intended to be
+// manipulated. You can see the schema by looking at the `Validate*` functions.
+func (lockFile *File) DependencySignatures() map[string]string {
+	return lockFile.DependencySignatures_
+}
+
+// Signature returns the signature of the resource being locked.
+func (lockFile *File) Signature() string {
+	return lockFile.Signature_
+}
+
+// UpdateSignature updates the signature of a resource being locked.
+func (lockFile *File) UpdateSignature(signature string) {
+	lockFile.Signature_ = signature
+}
+
+// Name returns the name of the resource being locked. This is primarily used
+// for debugging; in the case of file locks, it's the path to the file, while
+// in tests it's just a string.
+func (lockFile *File) Name() string {
+	return lockFile.name
+}
+
+// IsLocked indicates whether the resource being locked is allowed to be
+// overwritten.
+func (lockFile *File) IsLocked() bool {
+	return lockFile.isLocked
 }
 
 // DeserializeLockFile takes an `io.Reader` and transforms that into a
 // `lock.File`. No validation occurs. The `name` parameter is so that we can
 // print out intelligible errors; sometimes `name` is a path, and other times
 // (such as in tests) it is just a string.
-func DeserializeLockFile(lockFileReader io.Reader, name string) (lockFile File, deserializeErr error) {
+func DeserializeLockFile(lockFileReader io.Reader, name string) (Manager, error) {
 	lockFileData, deserializeErr := ioutil.ReadAll(lockFileReader)
 	if deserializeErr != nil {
-		return
+		return nil, deserializeErr
 	}
 
+	lockFile := File{}
 	deserializeErr = yaml.Unmarshal(lockFileData, &lockFile)
 	if deserializeErr != nil {
-		return
+		return nil, deserializeErr
 	}
 
 	lockFile.name = name
 
-	return
+	return &lockFile, nil
 }
 
 // SerializeLockFile takes a `lock.File` and writes it to an `io.Writer`.
 func SerializeLockFile(
-	lockFile File,
+	lockFile Manager,
 	lockFileWriter io.Writer,
 ) (serializeErr error) {
 	serialized, serializeErr := yaml.Marshal(lockFile)
@@ -95,17 +129,17 @@ func SerializeLockFile(
 
 // ValidateCorpusLockFile will deserialize and validate a lockfile for a corpus
 // dataset.
-func ValidateCorpusLockFile(corpusLockFile File) error {
+func ValidateCorpusLockFile(corpusLockFile Manager) error {
 	// Corpus lock file:
 	// * DependencySignatures is empty.
 	// * Signature is the SHA512 of every datafile inside the corpus.
 
-	if len(corpusLockFile.DependencySignatures) != 0 {
+	if len(corpusLockFile.DependencySignatures()) != 0 {
 		return errors.New("Corpus lock file contains dependencies, but " +
 			"corpus lock file must have no dependencies")
 	}
 
-	if corpusLockFile.Signature == "" {
+	if corpusLockFile.Signature() == "" {
 		return errors.New("Corpus lock file does not contain a signature for " +
 			"corpus, but this field is required")
 	}
@@ -116,8 +150,8 @@ func ValidateCorpusLockFile(corpusLockFile File) error {
 // ValidateSampleLockFile will deserialize and validate the lockfile for a
 // sample, and validate it against the corpus lockfile it depends on.
 func ValidateSampleLockFile(
-	corpusLockFile File,
-	sampleLockFile File,
+	corpusLockFile Manager,
+	sampleLockFile Manager,
 ) error {
 	// SampleLock:
 	// * DependencySignatures is a dictionary of 1 key, `corpus`, which maps to
@@ -132,7 +166,7 @@ func ValidateSampleLockFile(
 		return validationErr
 	}
 
-	if sampleLockFile.Signature == "" {
+	if sampleLockFile.Signature() == "" {
 		return errors.New("Sample lock file did not contain a valid " +
 			"signature; the lock file may be corrupt, and you might need to " +
 			"re-generate the corpus sample")
@@ -145,8 +179,8 @@ func ValidateSampleLockFile(
 // BitFunnel runtime configuration, and validate it against the sample lockfile
 // it depends on.
 func ValidateConfigLockFile(
-	sampleLockFile File,
-	configLockFile File,
+	sampleLockFile Manager,
+	configLockFile Manager,
 ) error {
 	// ConfigLock:
 	// * DependencySignatures is a dictionary of 1 key, `sample`, which maps to
@@ -162,7 +196,7 @@ func ValidateConfigLockFile(
 		return validationErr
 	}
 
-	if configLockFile.Signature == "" {
+	if configLockFile.Signature() == "" {
 		return errors.New("Configuration lock file did not contain a valid " +
 			"signature; the lock file may be corrupt, and you might need to " +
 			"re-generate the BitFunnel runtime configuration")
@@ -175,9 +209,9 @@ func ValidateConfigLockFile(
 // BitFunnel experiment, and validate it against both the sample and
 // configuration lockfiles it depends on.
 func ValidateExperimentLockFile(
-	sampleLockFile File,
-	configLockFile File,
-	experimentLockFile File,
+	sampleLockFile Manager,
+	configLockFile Manager,
+	experimentLockFile Manager,
 ) error {
 	// ExperimentLock:
 	// * DependencySignatures is a dictionary of 2 keys: `sample`, which maps
@@ -185,10 +219,10 @@ func ValidateExperimentLockFile(
 	//   signature of that corpus.
 	// * Signature is empty?
 
-	if len(experimentLockFile.DependencySignatures) != 2 {
+	if len(experimentLockFile.DependencySignatures()) != 2 {
 		return fmt.Errorf("Lockfile for a data sample require "+
 			"exactly 1 dependency, but %d were given",
-			len(experimentLockFile.DependencySignatures))
+			len(experimentLockFile.DependencySignatures()))
 	}
 
 	validateSampleErr := validateDependency(
@@ -218,27 +252,27 @@ func normalizeSignature(signature string) string {
 }
 
 func validateDependency(
-	currentLockFile File,
-	dependencyLockFile File,
+	currentLockFile Manager,
+	dependencyLockFile Manager,
 	key string,
 ) error {
-	rawActualSignature, ok := currentLockFile.DependencySignatures[key]
+	rawActualSignature, ok := currentLockFile.DependencySignatures()[key]
 	if !ok {
 		return fmt.Errorf("Lock file for data sample does not contain a key "+
 			"'%s', which is expected to contain the signature for the"+
 			"dependency data", corpusKey)
 	}
 
-	expectedSignature := normalizeSignature(dependencyLockFile.Signature)
+	expectedSignature := normalizeSignature(dependencyLockFile.Signature())
 	actualSignature := normalizeSignature(rawActualSignature)
 	if expectedSignature == "" {
 		return fmt.Errorf("Attempted to parse lock file '%s', but signature "+
 			"was missing",
-			dependencyLockFile.name)
+			dependencyLockFile.Name())
 	} else if actualSignature == "" {
 		return fmt.Errorf("Attempted to parse lock file '%s', but "+
 			"dependency for key '%s' was missing",
-			currentLockFile.name,
+			currentLockFile.Name(),
 			key)
 	} else if expectedSignature != actualSignature {
 		return fmt.Errorf("Lockfile contains a key '%s', with expected "+
@@ -253,13 +287,13 @@ func validateDependency(
 }
 
 func validateSingletonDependency(
-	currentLockFile File,
-	dependencyLockFile File,
+	currentLockFile Manager,
+	dependencyLockFile Manager,
 	key string,
 ) error {
-	if len(currentLockFile.DependencySignatures) != 1 {
+	if len(currentLockFile.DependencySignatures()) != 1 {
 		return fmt.Errorf("Lockfile requires exactly 1 dependency, but %d "+
-			"were given", len(currentLockFile.DependencySignatures))
+			"were given", len(currentLockFile.DependencySignatures()))
 	}
 
 	validationErr := validateDependency(

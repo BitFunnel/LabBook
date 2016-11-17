@@ -20,17 +20,26 @@ import (
 
 const lockFileName = "LOCKFILE"
 
-// CacheOperation will perform some data processing step, and dump the results
-// in a set of files. Those filenames will then be return as absolute paths, so
-// that the filemanager can generate a signature to verify the cache.
-type CacheOperation func(sample *schema.Sample) ([]string, error)
+// CacheCorpusOperation represents a cachable corpus decompression operation.
+// When the corpus is decompressed, this function should generate a signature
+// for all the data in the corpus, and return it. We can then later use this
+// signature to verify that the data in the corpus is what we think it is.
+type CacheCorpusOperation func() (string, error)
+
+// CacheSampleOperation represents the operation of generating a cachable
+// sample of a corpus. The function should take a schema describing the sample
+// to generate, and runs BitFunnel's `filter` command. The result is a set of
+// filenames which the `file.Manager` can then open up to obtain a signature.
+type CacheSampleOperation func(sample *schema.Sample) ([]string, error)
 
 // Manager manages the lifecycle of the experiment files. This includes
 // fetching remote script and manifest files, writing them to the config, and
 // so on.
 type Manager interface {
+	CacheDecompressedCorpus(decompressCorpus CacheCorpusOperation) error
+
 	VerifySampleCache() error
-	CacheSamples(samples []*schema.Sample, createSamples CacheOperation) error
+	CacheSamples(samples []*schema.Sample, createSamples CacheSampleOperation) error
 
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
 	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
@@ -86,23 +95,39 @@ type managerContext struct {
 	exptLockfilePath    string
 }
 
+func (m managerContext) CacheDecompressedCorpus(decompressCorpus CacheCorpusOperation) error {
+	_, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
+	if lockAcqErr != nil {
+		return lockAcqErr
+	}
+
+	_, decompressErr := decompressCorpus()
+	if decompressErr != nil {
+		return decompressErr
+	}
+
+	// TODO: Set signature with corpus lock.
+
+	return nil
+}
+
 func (m managerContext) VerifySampleCache() error {
 	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusLockfilePath)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
-	defer m.releaseLockFile(&corpusLock)
+	defer m.releaseLockFile(corpusLock)
 
 	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleLockfilePath)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
-	defer m.releaseLockFile(&sampleLock)
+	defer m.releaseLockFile(sampleLock)
 
 	return lock.ValidateSampleLockFile(corpusLock, sampleLock)
 }
 
-func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples CacheOperation) error {
+func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples CacheSampleOperation) error {
 	// `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
 	// Then deserialize, return struct here. Rationale is: because we are not
 	// changing the corpus (or the corpus lock), we will always want put it
@@ -121,7 +146,7 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// `ReleaseLock` returns. Probably name the `error` return parameter, and
 	// wrap this in a func that sets it in the case of error.
 	// TODO: Look at entire codebase for bad uses of `defer`.
-	defer m.releaseLockFile(&corpusLock)
+	defer m.releaseLockFile(corpusLock)
 
 	// TODO: Probably want to acquire the locks of all samples.
 
@@ -155,7 +180,7 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// TODO: We need to set the sample signature, and release all of the locks.
 
 	// Write out lock only on success.
-	return m.releaseLockFile(&sampleLock)
+	return m.releaseLockFile(sampleLock)
 }
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
@@ -251,12 +276,12 @@ func (m managerContext) GetScriptPath() string {
 // PRIVATE METHODS.
 //
 
-func (m managerContext) acquireLockFile(corpusPath string) (lock.File, error) {
+func (m managerContext) acquireLockFile(corpusPath string) (lock.Manager, error) {
 	// TODO: This is a dummy implementation.
 	panic("Not implemented")
 }
 
-func (m managerContext) releaseLockFile(lock *lock.File) error {
+func (m managerContext) releaseLockFile(lock lock.Manager) error {
 	// TODO: This is a dummy implementation.
 	panic("Not implemented")
 }

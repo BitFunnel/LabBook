@@ -127,6 +127,16 @@ func SerializeLockFile(
 	return
 }
 
+// NewCorpusLockFile creates a lockfile representing a corpus.
+func NewCorpusLockFile(name string, signature string) Manager {
+	return &File{
+		DependencySignatures_: make(map[string]string),
+		Signature_:            signature,
+		name:                  name,
+		isLocked:              false,
+	}
+}
+
 // ValidateCorpusLockFile will deserialize and validate a lockfile for a corpus
 // dataset.
 func ValidateCorpusLockFile(corpusLockFile Manager) error {

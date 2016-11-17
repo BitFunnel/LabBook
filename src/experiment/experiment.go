@@ -67,11 +67,17 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 		return bfError
 	}
 
-	// Uncompress corpus, find filepaths of all corpus files.
+	fileManager := file.NewManager(
+		expt.corpusRoot,
+		expt.experimentRoot,
+		sampleNames(schema.Samples))
 	corpusManager := corpus.NewManager(schema.Corpus, expt.corpusRoot)
-	uncompressErr := corpusManager.Uncompress()
-	if uncompressErr != nil {
-		return uncompressErr
+
+	// Decompress corpus, find filepaths of all corpus files.
+	corpusCacheErr :=
+		fileManager.InitDecompressedCorpusCache(corpusManager.Decompress)
+	if corpusCacheErr != nil {
+		return corpusCacheErr
 	}
 	corpusPaths, walkErr := corpusManager.GetAllCorpusFilepaths()
 	if walkErr != nil {
@@ -81,10 +87,6 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 
 	// Write the configuration manifest we'll pass to `termtable` and
 	// `statistics`. Fetch query log and write the experiment script.
-	fileManager := file.NewManager(
-		expt.corpusRoot,
-		expt.experimentRoot,
-		sampleNames(schema.Samples))
 	configManifestWriteErr := fileManager.WriteConfigManifestFile(corpusPaths)
 	if configManifestWriteErr != nil {
 		return configManifestWriteErr

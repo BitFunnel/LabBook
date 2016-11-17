@@ -15,7 +15,7 @@ import (
 // Manager is responsible for the lifecycle of the corpus, including
 // downloading, verifying, and uncompressing.
 type Manager interface {
-	Uncompress() error
+	Decompress() (signature string, decompressErr error)
 	GetAllCorpusFilepaths() ([]string, error)
 }
 
@@ -25,17 +25,15 @@ func NewManager(chunks []*Chunk, corpusRoot string) Manager {
 	return &corpusContext{
 		chunks:       chunks,
 		corpusRoot:   corpusRoot,
-		uncompressed: false,
+		decompressed: false,
 	}
 }
 
-// TODO: Rename `Uncompress` -> `Decompress`.
-
-// Uncompress will uncompress the corpus files that `ctx` is responsible for
+// Decompress will decompress the corpus files that `ctx` is responsible for
 // managing.
-func (ctx *corpusContext) Uncompress() error {
-	if ctx.uncompressed {
-		return fmt.Errorf("Corpus at '%s' has already been uncompressed",
+func (ctx *corpusContext) Decompress() (string, error) {
+	if ctx.decompressed {
+		return "", fmt.Errorf("Corpus at '%s' has already been uncompressed",
 			ctx.corpusRoot)
 	}
 
@@ -50,15 +48,15 @@ func (ctx *corpusContext) Uncompress() error {
 
 		tarballData, readErr := getCompressedChunkData(chunkPath)
 		if readErr != nil {
-			return readErr
+			return "", readErr
 		}
 
 		tarballSignature, sigErr :=
 			signatureAccumulator.AddCorpusTarball(tarballData)
 		if sigErr != nil {
-			return sigErr
+			return "", sigErr
 		} else if tarballSignature != chunk.SHA512 {
-			return fmt.Errorf("Signature for corpus file '%s' does not "+
+			return "", fmt.Errorf("Signature for corpus file '%s' does not "+
 				"match the hash specified in experiment YAML; it is "+
 				"possible you have specified an incorrect corpus file",
 				chunkPath)
@@ -73,26 +71,26 @@ func (ctx *corpusContext) Uncompress() error {
 			"-C",
 			ctx.corpusRoot)
 		if tarErr != nil {
-			return tarErr
+			return "", tarErr
 		}
 	}
 
 	// TODO: Have this return the signature.
-	_, sigErr := signatureAccumulator.Signature()
+	corpusSignature, sigErr := signatureAccumulator.Signature()
 	if sigErr != nil {
-		return sigErr
+		return "", sigErr
 	}
 
-	ctx.uncompressed = true
+	ctx.decompressed = true
 
-	return nil
+	return corpusSignature, nil
 }
 
 // GetAllCorpusFilepaths returns the absolute path of every file in the corpus.
 func (ctx *corpusContext) GetAllCorpusFilepaths() ([]string, error) {
 	// TODO: Consider making chunk files have a `.chunk` suffix to simplify
 	// this.
-	if !ctx.uncompressed {
+	if !ctx.decompressed {
 		return []string{}, fmt.Errorf("Can't get paths of corpus files "+
 			"rooted at '%s', since they haven't been uncompressed yet",
 			ctx.corpusRoot)
@@ -106,7 +104,7 @@ func (ctx *corpusContext) GetAllCorpusFilepaths() ([]string, error) {
 
 	// Obtain paths to all the corpus files. We expect every the corpus root to
 	// contain only tarballs (which are the corpus) and folders (which were
-	// generated when we called `Uncompress`). IMPORTANT: Any file we find in
+	// generated when we called `Decompress`). IMPORTANT: Any file we find in
 	// these subfolders is considered a corpus file.
 	for _, file := range files {
 		// Corpus root should contains tarballs (i.e, compressed corpus files)
@@ -191,7 +189,7 @@ func (chunk *Chunk) validate(reader io.Reader) bool {
 type corpusContext struct {
 	chunks       []*Chunk
 	corpusRoot   string
-	uncompressed bool
+	decompressed bool
 }
 
 // TODO: Put `Chunk` in its own file?

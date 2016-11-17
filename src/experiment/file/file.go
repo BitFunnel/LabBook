@@ -37,12 +37,18 @@ type CacheSampleOperation func(sample *schema.Sample) ([]string, error)
 // fetching remote script and manifest files, writing them to the config, and
 // so on.
 type Manager interface {
-	CacheDecompressedCorpus(decompressCorpus CacheCorpusOperation) error
+	// TODO: Consider moving these into their own module -- caching is complex
+	// and we want to get it right.
+	InitDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error
+	UpdateDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error
 
+	InitSampleCache(samples []*schema.Sample, createSamples CacheSampleOperation) error
+	// UpdateSampleCache(samples []*schema.Sample, createSamples CacheSampleOperation) error
 	VerifySampleCache() error
-	CacheSamples(samples []*schema.Sample, createSamples CacheSampleOperation) error
 
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
+	// TODO: Move the "fetch" part of this out of `file.Manager`. This should
+	// only manage files.
 	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
 
 	// Methods that return paths we can send to BitFunnel's shell commands.
@@ -64,6 +70,7 @@ func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) 
 	}
 
 	return managerContext{
+		experimentRoot:      experimentRoot,
 		configRoot:          configRoot,
 		corpusRoot:          corpusRoot,
 		sampleRoot:          sampleRoot,
@@ -77,6 +84,7 @@ func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) 
 }
 
 type managerContext struct {
+	experimentRoot      string
 	configRoot          string
 	corpusRoot          string
 	sampleRoot          string
@@ -88,8 +96,31 @@ type managerContext struct {
 	runtimeManifestPath string
 }
 
-func (m managerContext) CacheDecompressedCorpus(decompressCorpus CacheCorpusOperation) error {
-	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
+// CacheDecompressedCorpus initializes a corpus cache: it will decompress a
+// corpus, cache it, and generate a lock file for the cache. Note that, because
+// this is an initialization procedure, we do not acquire the lock file, hence,
+// we are not protected against multiple processes.
+func (m managerContext) InitDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error {
+	lockPath := filepath.Join(m.experimentRoot, lockFileName)
+	corpusSignature, decompressErr := decompressCorpus()
+	if decompressErr != nil {
+		return decompressErr
+	}
+
+	corpusLock := lock.NewCorpusLockFile(lockPath, corpusSignature)
+
+	writeErr := m.writeLockFile(lockPath, corpusLock)
+	if writeErr != nil {
+		return writeErr
+	}
+
+	return nil
+}
+
+func (m managerContext) UpdateDecompressedCorpusCache(
+	decompressCorpus CacheCorpusOperation,
+) error {
+	corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
@@ -102,32 +133,32 @@ func (m managerContext) CacheDecompressedCorpus(decompressCorpus CacheCorpusOper
 	corpusLock.UpdateSignature(corpusSignature)
 
 	// Release the lock file if and only if we're successful with the above.
-	return m.releaseLockFile(m.corpusRoot, corpusLock)
+	return m.releaseLockFile(m.experimentRoot, corpusLock)
 }
 
 func (m managerContext) VerifySampleCache() error {
-	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
+	corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
-	defer m.releaseLockFile(m.corpusRoot, corpusLock)
+	defer m.releaseLockFile(m.experimentRoot, corpusLock)
 
-	sampleLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
+	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
-	defer m.releaseLockFile(m.corpusRoot, sampleLock)
+	defer m.releaseLockFile(m.sampleRoot, sampleLock)
 
 	return lock.ValidateSampleLockFile(corpusLock, sampleLock)
 }
 
-func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples CacheSampleOperation) error {
+func (m managerContext) InitSampleCache(samples []*schema.Sample, createSamples CacheSampleOperation) error {
 	// `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
 	// Then deserialize, return struct here. Rationale is: because we are not
 	// changing the corpus (or the corpus lock), we will always want put it
 	// back. It's not important that it's moved to .LOCKFILE, it just seems
 	// convenient.
-	corpusLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
+	corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
 	if lockAcqErr != nil {
 		// This error should already explain the problem, e.g., if the
 		// .LOCKFILE exists and LOCKFILE does not.
@@ -140,14 +171,14 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// `ReleaseLock` returns. Probably name the `error` return parameter, and
 	// wrap this in a func that sets it in the case of error.
 	// TODO: Look at entire codebase for bad uses of `defer`.
-	defer m.releaseLockFile(m.corpusRoot, corpusLock)
+	defer m.releaseLockFile(m.experimentRoot, corpusLock)
 
 	// TODO: Probably want to acquire the locks of all samples.
 
 	// Attempt to acquire the LOCKFILE for samples. As above, this will either
 	// delete LOCKFILE or move it. This time we only want to write out a new
 	// LOCKFILE on success.
-	sampleLock, lockAcqErr := m.acquireLockFile(m.corpusRoot)
+	sampleLock, lockAcqErr := m.acquireLockFile(m.sampleRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
 	}
@@ -174,7 +205,7 @@ func (m managerContext) CacheSamples(samples []*schema.Sample, createSamples Cac
 	// TODO: We need to set the sample signature, and release all of the locks.
 
 	// Write out lock only on success.
-	return m.releaseLockFile(m.corpusRoot, sampleLock)
+	return m.releaseLockFile(m.sampleRoot, sampleLock)
 }
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
@@ -297,15 +328,9 @@ func (m managerContext) acquireLockFile(
 		return nil, couldNotRemoveSourceError(lockPath, removeErr)
 	}
 
-	lockFileData, readErr := fs.Open(tmpLockPath)
+	lockFile, readErr := m.readLockFile(tmpLockPath)
 	if readErr != nil {
-		return nil, fmt.Errorf("Attempted to acquire lock, but could not read from file '%s'", tmpLockPath)
-	}
-	defer lockFileData.Close()
-
-	lockFile, deserErr := lock.DeserializeLockFile(lockFileData, tmpLockPath)
-	if deserErr != nil {
-		return nil, fmt.Errorf("Attempted to acquire lock, but could not read from file '%s'", tmpLockPath)
+		return nil, readErr
 	}
 
 	return lockFile, nil
@@ -318,16 +343,9 @@ func (m managerContext) releaseLockFile(
 	lockPath := filepath.Join(directory, lockFileName)
 	tmpLockPath := filepath.Join(directory, tmpLockFileName)
 
-	lockFileData, readErr := fs.Create(tmpLockPath)
-	if readErr != nil {
-		return fmt.Errorf("Attempted to release lock file, but could not read from file '%s':\n%v", tmpLockPath, readErr)
-	}
-	defer lockFileData.Close()
-
-	serializeErr := lock.SerializeLockFile(lockFile, lockFileData)
-	if serializeErr != nil {
-		// TODO: Consider deleting the lockfile if we can't write to it.
-		return fmt.Errorf("Attempted to release lock file, but could not write data to lock file at '%s'; ", tmpLockPath)
+	writeErr := m.writeLockFile(tmpLockPath, lockFile)
+	if writeErr != nil {
+		return writeErr
 	}
 
 	linkErr := os.Link(tmpLockPath, lockPath)
@@ -372,6 +390,42 @@ func (m managerContext) createSampleDirectories() error {
 	}
 
 	return nil
+}
+
+func (m managerContext) writeLockFile(
+	lockPath string,
+	lockFile lock.Manager,
+) error {
+	lockFileData, createErr := fs.Create(lockPath)
+	if createErr != nil {
+		return fmt.Errorf("Attempt to write lock file '%s' failed:\n%v", lockPath, createErr)
+	}
+	defer lockFileData.Close()
+
+	serializeErr := lock.SerializeLockFile(lockFile, lockFileData)
+	if serializeErr != nil {
+		// TODO: Consider deleting the lockfile if we can't write to it.
+		return fmt.Errorf("Attempt to serialize and write lock file '%s' failed:\n%v ", lockPath, serializeErr)
+	}
+
+	return nil
+}
+
+func (m managerContext) readLockFile(
+	lockPath string,
+) (lock.Manager, error) {
+	lockFileData, readErr := fs.Open(lockPath)
+	if readErr != nil {
+		return nil, fmt.Errorf("Attempted to read lock file '%s', but failed:\n%v", lockPath, readErr)
+	}
+	defer lockFileData.Close()
+
+	lockFile, deserErr := lock.DeserializeLockFile(lockFileData, lockPath)
+	if deserErr != nil {
+		return nil, fmt.Errorf("Attempted to read and deserialize lock file '%s', but failed:\n%v", lockPath, deserErr)
+	}
+
+	return lockFile, nil
 }
 
 func (m managerContext) writeScript(manifestPaths []string, queryLog []string) error {

@@ -16,9 +16,6 @@ import (
 	"github.com/BitFunnel/LabBook/src/util"
 )
 
-// TODO: Change (m managerContext) to be (m *managerContext) in all of these
-// method recievers!
-
 const lockFileName = "LOCKFILE"
 const tmpLockFileName = ".LOCKFILE"
 
@@ -74,7 +71,7 @@ func NewManager(corpusRoot string, experimentRoot string, sampleNames []string) 
 		samplePaths[sampleName] = filepath.Join(sampleRoot, sampleName)
 	}
 
-	return managerContext{
+	return &managerContext{
 		experimentRoot:      experimentRoot,
 		configRoot:          configRoot,
 		corpusRoot:          corpusRoot,
@@ -105,7 +102,7 @@ type managerContext struct {
 // corpus, cache it, and generate a lock file for the cache. Note that, because
 // this is an initialization procedure, we do not acquire the lock file, hence,
 // we are not protected against multiple processes.
-func (m managerContext) InitDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error {
+func (m *managerContext) InitDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error {
 	lockPath := filepath.Join(m.experimentRoot, lockFileName)
 	corpusSignature, decompressErr := decompressCorpus()
 	if decompressErr != nil {
@@ -122,7 +119,7 @@ func (m managerContext) InitDecompressedCorpusCache(decompressCorpus CacheCorpus
 	return nil
 }
 
-func (m managerContext) UpdateDecompressedCorpusCache(
+func (m *managerContext) UpdateDecompressedCorpusCache(
 	decompressCorpus CacheCorpusOperation,
 ) error {
 	corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
@@ -141,7 +138,7 @@ func (m managerContext) UpdateDecompressedCorpusCache(
 	return m.releaseLockFile(m.experimentRoot, corpusLock)
 }
 
-func (m managerContext) VerifySampleCache() error {
+func (m *managerContext) VerifySampleCache() error {
 	corpusLock, lockAcqErr := m.acquireLockFile(m.experimentRoot)
 	if lockAcqErr != nil {
 		return lockAcqErr
@@ -157,7 +154,7 @@ func (m managerContext) VerifySampleCache() error {
 	return lock.ValidateSampleLockFile(corpusLock, sampleLock)
 }
 
-func (m managerContext) InitSampleCache(
+func (m *managerContext) InitSampleCache(
 	samples []*schema.Sample,
 	createSample CacheSampleOperation,
 ) error {
@@ -226,7 +223,7 @@ func (m managerContext) InitSampleCache(
 	return nil
 }
 
-func (m managerContext) UpdateSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error {
+func (m *managerContext) UpdateSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error {
 	return nil
 	// // `Acquire` should either delete LOCKFILE, or move LOCKFILE -> .LOCKFILE.
 	// // Then deserialize, return struct here. Rationale is: because we are not
@@ -285,7 +282,7 @@ func (m managerContext) UpdateSampleCache(samples []*schema.Sample, createSample
 
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
 // writes them to the manifest file.
-func (m managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) error {
+func (m *managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) error {
 	mkConfigRootErr := fs.MkdirAll(m.configRoot, 0777)
 	if mkConfigRootErr != nil {
 		return mkConfigRootErr
@@ -304,7 +301,7 @@ func (m managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) er
 // FetchMetadataAndWriteScript will fetch the metadata needed to generate a
 // script for an experiment (e.g., a query log), and then generates and writes
 // the script.
-func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error {
+func (m *managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error {
 	queryLog, queryLogFetchErr := fetchFileLines(
 		queryLogURL.String(),
 		queryLogSHA512)
@@ -336,7 +333,7 @@ func (m managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogU
 // GetConfigRoot will get the path to the root of the directory that contains
 // configuration information for BitFunnel's runtime (e.g., files for the term
 // table, statistics, etc.)
-func (m managerContext) GetConfigRoot() string {
+func (m *managerContext) GetConfigRoot() string {
 	return m.configRoot
 }
 
@@ -344,14 +341,14 @@ func (m managerContext) GetConfigRoot() string {
 // the corpus sample used to configure the experiment. Typically this is given
 // to the BitFunnel tools to generate a sample of the corpus to runtime
 // `statistics` and `termtable` on (for example).
-func (m managerContext) GetConfigManifestPath() string {
+func (m *managerContext) GetConfigManifestPath() string {
 	return m.configManifestPath
 }
 
 // GetSamplePath will get the canonical directory meant to hold the sample of
 // the corpus denoted by `sampleName`. For example, if we have a sample called
 // `sample1`, this will return the directory that corresponds to that sample.
-func (m managerContext) GetSamplePath(sampleName string) (string, bool) {
+func (m *managerContext) GetSamplePath(sampleName string) (string, bool) {
 	manifestPath, ok := m.samplePaths[sampleName]
 	return manifestPath, ok
 }
@@ -360,14 +357,14 @@ func (m managerContext) GetSamplePath(sampleName string) (string, bool) {
 // an experiment's corpus sample. For example, if we have a sample named
 // `sample1`, this will return a manifest file listing all the files in the
 // corpus sample `sample1`.
-func (m managerContext) GetSampleManifestPath(sampleName string) (string, bool) {
+func (m *managerContext) GetSampleManifestPath(sampleName string) (string, bool) {
 	manifestPath, ok := m.samplePaths[sampleName]
 	return filepath.Join(manifestPath, "Manifest.txt"), ok
 }
 
 // GetScriptPath will return the path to the canonical script file for the
 // experiment.
-func (m managerContext) GetScriptPath() string {
+func (m *managerContext) GetScriptPath() string {
 	// TODO: Check that this was actually generated?
 	return m.scriptPath
 }
@@ -376,7 +373,7 @@ func (m managerContext) GetScriptPath() string {
 // PRIVATE METHODS.
 //
 
-func (m managerContext) acquireLockFile(
+func (m *managerContext) acquireLockFile(
 	directory string,
 ) (lock.Manager, error) {
 	lockPath := filepath.Join(directory, lockFileName)
@@ -411,7 +408,7 @@ func (m managerContext) acquireLockFile(
 	return lockFile, nil
 }
 
-func (m managerContext) releaseLockFile(
+func (m *managerContext) releaseLockFile(
 	directory string,
 	lockFile lock.Manager,
 ) error {
@@ -446,9 +443,12 @@ func (m managerContext) releaseLockFile(
 	return nil
 }
 
-func (m managerContext) createSignature(dataPaths []string) (string, error) {
+func (m *managerContext) createSignature(dataPaths []string) (string, error) {
 	signatureAccumulator := signature.NewSampleSignatureAccumulator()
 	for _, path := range dataPaths {
+		// TODO: This will cause -dry-run to fail because we never add teh
+		// empty bytes to the signature, which causes the call to signature to
+		// fail.
 		if path == "" {
 			continue
 		}
@@ -481,7 +481,7 @@ func (m managerContext) createSignature(dataPaths []string) (string, error) {
 // the filtered samples for an experiment. For example, if an experiment
 // defines 2 samples with names `sample1` and `sample2`, this will create
 // directories for each.
-func (m managerContext) createSampleDirectories() error {
+func (m *managerContext) createSampleDirectories() error {
 	for _, samplePath := range m.samplePaths {
 		mkdirFilteredCorpusRoot := fs.MkdirAll(samplePath, 0777)
 		if mkdirFilteredCorpusRoot != nil {
@@ -493,7 +493,7 @@ func (m managerContext) createSampleDirectories() error {
 	return nil
 }
 
-func (m managerContext) writeLockFile(
+func (m *managerContext) writeLockFile(
 	lockPath string,
 	lockFile lock.Manager,
 ) error {
@@ -514,7 +514,7 @@ func (m managerContext) writeLockFile(
 	return nil
 }
 
-func (m managerContext) readLockFile(
+func (m *managerContext) readLockFile(
 	lockPath string,
 ) (lock.Manager, error) {
 	lockFileData, readErr := fs.Open(lockPath)
@@ -531,7 +531,7 @@ func (m managerContext) readLockFile(
 	return lockFile, nil
 }
 
-func (m managerContext) writeScript(manifestPaths []string, queryLog []string) error {
+func (m *managerContext) writeScript(manifestPaths []string, queryLog []string) error {
 	mkdirErr := fs.MkdirAll(m.configRoot, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
@@ -586,7 +586,7 @@ func (m managerContext) writeScript(manifestPaths []string, queryLog []string) e
 	return nil
 }
 
-func (m managerContext) writeQueriesToScript(w *os.File, queryLog []string, verify bool) error {
+func (m *managerContext) writeQueriesToScript(w *os.File, queryLog []string, verify bool) error {
 	var outPath string
 	var queryBasis string
 	if verify {

@@ -3,8 +3,8 @@ package git
 import (
 	"fmt"
 
-	"github.com/BitFunnel/LabBook/src/systems/fs"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
+	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
 
 const gitCommand = "git"
@@ -92,7 +92,7 @@ func (repo *repoContext) CloneFromOrigin() error {
 // GetConfig runs the `git config --get` command that returns the value of
 // some `variable`.
 func (repo *repoContext) GetConfig(variable string) (configOut string, configErr error) {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.repoRoot)
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return "", chdirErr
 	}
@@ -110,7 +110,7 @@ func (repo *repoContext) GetConfig(variable string) (configOut string, configErr
 
 // Fetch runs the `git fetch` command in a shell.
 func (repo *repoContext) Fetch(remote string) error {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.repoRoot)
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}
@@ -124,7 +124,7 @@ func (repo *repoContext) Fetch(remote string) error {
 // either the name of the branch we're on, or the commit hash if we're in a
 // detached head.
 func (repo *repoContext) GetRevParseStrictRef(ref string) (revParse string, revParseErr error) {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.repoRoot)
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return "", chdirErr
 	}
@@ -147,7 +147,7 @@ func (repo *repoContext) GetRevParseStrictRef(ref string) (revParse string, revP
 // of `ref`. For example, if `ref` is `HEAD`, this will return the commit hash
 // of `HEAD`.
 func (repo *repoContext) GetRevParseRef(ref string) (revParse string, revparseErr error) {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.repoRoot)
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return "", chdirErr
 	}
@@ -164,7 +164,7 @@ func (repo *repoContext) GetRevParseRef(ref string) (revParse string, revparseEr
 
 // Checkout runs the `git checkout` command in a shell.
 func (repo *repoContext) Checkout(sha string) error {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.repoRoot)
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}

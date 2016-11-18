@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/BitFunnel/LabBook/src/bfrepo/git"
-	"github.com/BitFunnel/LabBook/src/systems/fs"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
+	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
 
 // NOTE: Git remotes are case-insensitive, which is why they're lowercase here.
@@ -129,7 +129,7 @@ func (repo *bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 // Configure switches to the directory of the BitFunnel root, and runs
 // the configuration script that generates a makefile.
 func (repo *bfRepoContext) ConfigureBuild() error {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.gitRepo.GetRepoRootPath())
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.gitRepo.GetRepoRootPath())
 	if chdirErr != nil {
 		return chdirErr
 	}
@@ -141,7 +141,7 @@ func (repo *bfRepoContext) ConfigureBuild() error {
 
 // Build switches to the BitFunnel build directory, and builds the code.
 func (repo *bfRepoContext) Build() error {
-	chdirHandle, chdirErr := fs.ScopedChdir(repo.buildRoot)
+	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.buildRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/BitFunnel/LabBook/src/experiment/file/lock"
 	"github.com/BitFunnel/LabBook/src/schema"
 	"github.com/BitFunnel/LabBook/src/signature"
-	"github.com/BitFunnel/LabBook/src/systems/fs"
+	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
 
 const lockFileName = "LOCKFILE"
@@ -345,13 +345,13 @@ func (m *managerContext) UpdateSampleCache(samples []*schema.Sample, createSampl
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
 // writes them to the manifest file.
 func (m *managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) error {
-	mkConfigRootErr := fs.MkdirAll(m.configRoot, 0777)
+	mkConfigRootErr := traceablefs.MkdirAll(m.configRoot, 0777)
 	if mkConfigRootErr != nil {
 		return mkConfigRootErr
 	}
 
 	fileBytes := []byte(strings.Join(absoluteCorpusPaths, "\n"))
-	writeErr := fs.WriteFile(m.configManifestPath, fileBytes, 0666)
+	writeErr := traceablefs.WriteFile(m.configManifestPath, fileBytes, 0666)
 	if writeErr != nil {
 		return fmt.Errorf("Failed to write configuration manifest file at "+
 			"'%s':\n%v", m.configManifestPath, writeErr)
@@ -450,7 +450,7 @@ func (m *managerContext) acquireLockFile(
 	// whichever process does not error out during this call can safely
 	// proceed.
 
-	linkErr := fs.Link(lockPath, tmpLockPath)
+	linkErr := traceablefs.Link(lockPath, tmpLockPath)
 	if linkErr != nil {
 		if os.IsNotExist(linkErr) {
 			return nil, sourceDoesNotExistError(lockPath)
@@ -461,7 +461,7 @@ func (m *managerContext) acquireLockFile(
 		}
 	}
 
-	removeErr := fs.Remove(lockPath)
+	removeErr := traceablefs.Remove(lockPath)
 	if removeErr != nil {
 		return nil, couldNotRemoveSourceError(lockPath, removeErr)
 	}
@@ -486,7 +486,7 @@ func (m *managerContext) releaseLockFile(
 		return writeErr
 	}
 
-	linkErr := fs.Link(tmpLockPath, lockPath)
+	linkErr := traceablefs.Link(tmpLockPath, lockPath)
 	if linkErr != nil {
 		if os.IsNotExist(linkErr) {
 			// return sourceDoesNotExistError(lockPath)
@@ -500,7 +500,7 @@ func (m *managerContext) releaseLockFile(
 		}
 	}
 
-	removeErr := fs.Remove(tmpLockPath)
+	removeErr := traceablefs.Remove(tmpLockPath)
 	if removeErr != nil {
 		// return couldNotRemoveSourceError(lockPath, removeErr)
 		return fmt.Errorf("Attempted to to release lock file, but we could not remove '%s' (this should not happen, please file a bug):\n%v", tmpLockPath, linkErr)
@@ -524,7 +524,7 @@ func (m *managerContext) createSignature(
 		// TODO: Probably we want to move this to some method.
 
 		// Get content.
-		file, openErr := fs.Open(path)
+		file, openErr := traceablefs.Open(path)
 		if openErr != nil {
 			return "", fmt.Errorf("Attempted to create signature for data, but failed to open path '%s':\n%v", path, openErr)
 		}
@@ -551,7 +551,7 @@ func (m *managerContext) createSignature(
 // directories for each.
 func (m *managerContext) createSampleDirectories() error {
 	for _, samplePath := range m.samplePaths {
-		mkdirFilteredCorpusRoot := fs.MkdirAll(samplePath, 0777)
+		mkdirFilteredCorpusRoot := traceablefs.MkdirAll(samplePath, 0777)
 		if mkdirFilteredCorpusRoot != nil {
 			return fmt.Errorf("Unable to create filtered corpus directory "+
 				"'%s':\n%v", samplePath, mkdirFilteredCorpusRoot)
@@ -565,7 +565,7 @@ func (m *managerContext) writeLockFile(
 	lockPath string,
 	lockFile lock.Manager,
 ) error {
-	lockFileData, createErr := fs.Create(lockPath)
+	lockFileData, createErr := traceablefs.Create(lockPath)
 	if createErr != nil {
 		return fmt.Errorf("Attempt to write lock file '%s' failed:\n%v", lockPath, createErr)
 	}
@@ -585,7 +585,7 @@ func (m *managerContext) writeLockFile(
 func (m *managerContext) readLockFile(
 	lockPath string,
 ) (lock.Manager, error) {
-	lockFileData, readErr := fs.Open(lockPath)
+	lockFileData, readErr := traceablefs.Open(lockPath)
 	if readErr != nil {
 		return nil, fmt.Errorf("Attempted to read lock file '%s', but failed:\n%v", lockPath, readErr)
 	}
@@ -600,22 +600,22 @@ func (m *managerContext) readLockFile(
 }
 
 func (m *managerContext) writeScript(manifestPaths []string, queryLog []string) error {
-	mkdirErr := fs.MkdirAll(m.configRoot, 0777)
+	mkdirErr := traceablefs.MkdirAll(m.configRoot, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
-	mkdirErr = fs.MkdirAll(m.verifyOutPath, 0777)
+	mkdirErr = traceablefs.MkdirAll(m.verifyOutPath, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
-	mkdirErr = fs.MkdirAll(m.noVerifyOutPath, 0777)
+	mkdirErr = traceablefs.MkdirAll(m.noVerifyOutPath, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
 
 	// TODO: Check to see if this will overwrite, rather than append, if it
 	// already exists.
-	w, createErr := fs.Create(m.scriptPath)
+	w, createErr := traceablefs.Create(m.scriptPath)
 	if createErr != nil {
 		return createErr
 	}
@@ -763,7 +763,7 @@ func fetchFileLines(
 }
 
 func readFileLines(path string) ([]string, error) {
-	file, openErr := fs.Open(path)
+	file, openErr := traceablefs.Open(path)
 	if openErr != nil {
 		return nil, openErr
 	}

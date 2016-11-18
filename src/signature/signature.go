@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-
-	"github.com/BitFunnel/LabBook/src/util"
 )
 
 // Accumulator accumulates a signature for a corpus by
@@ -57,24 +55,4 @@ func (ctx *accumulatorContext) AccumulatedSignature() (string, error) {
 	}
 
 	return signatureString(ctx.signatureAccumulator), nil
-}
-
-//
-// PRIVATE FUNCTIONS.
-//
-
-func signature(tarballData []byte) (string, error) {
-	tarballSignature := sha512.New()
-
-	_, writeErr := tarballSignature.Write(tarballData)
-	if writeErr != nil {
-		return "", fmt.Errorf("Failed to generate signature for corpus "+
-			"tarball:\n%v", writeErr)
-	}
-
-	return signatureString(tarballSignature), nil
-}
-
-func signatureString(signature hash.Hash) string {
-	return util.NormalizeSignature(fmt.Sprintf("%x", signature.Sum(nil)))
 }

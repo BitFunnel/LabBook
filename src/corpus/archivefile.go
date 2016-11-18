@@ -4,7 +4,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/BitFunnel/LabBook/src/util"
+	"github.com/BitFunnel/LabBook/src/signature"
 )
 
 // TODO: Use validation step to populate a `Chunk.path` member?
@@ -22,5 +22,5 @@ func (chunk *ArchiveFile) validate(reader io.Reader) bool {
 		return false
 	}
 
-	return util.ValidateSHA512(stream, chunk.SHA512)
+	return signature.ValidateData(stream, chunk.SHA512)
 }

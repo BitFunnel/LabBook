@@ -13,7 +13,6 @@ import (
 	"github.com/BitFunnel/LabBook/src/schema"
 	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/BitFunnel/LabBook/src/systems/fs"
-	"github.com/BitFunnel/LabBook/src/util"
 )
 
 const lockFileName = "LOCKFILE"
@@ -743,7 +742,7 @@ func fetchFileLines(url string, validationSHA512 string) ([]string, error) {
 		return nil, readErr
 	}
 
-	if !util.ValidateSHA512(file, validationSHA512) {
+	if !signature.ValidateData(file, validationSHA512) {
 		return nil, fmt.Errorf("File located at resource '%s' does not "+
 			"match given SHA512 '%s'. Does this point to the version of the "+
 			"file required by the experiment?", url, validationSHA512)

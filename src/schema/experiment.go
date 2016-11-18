@@ -92,7 +92,7 @@ func (experiment *Experiment) validate() error {
 		if chunk.Name == "" {
 			return errors.New("Experiment schema contained a corpus without " +
 				"the mandatory field `name`")
-		} else if chunk.SHA512 == "" {
+		} else if chunk.FileSignature == "" {
 			return errors.New("Experiment schema contained a corpus without " +
 				"the mandatory field `sha512`")
 		}

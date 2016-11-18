@@ -105,7 +105,7 @@ func (expt *experimentContext) Configure(reader io.Reader) error {
 	fetchErr := fileManager.FetchMetadataAndWriteScript(
 		schema.RuntimeConfig.SampleName,
 		schema.QueryLog.URL,
-		schema.QueryLog.SHA512)
+		schema.QueryLog.FileSignature)
 	if fetchErr != nil {
 		return fetchErr
 	}

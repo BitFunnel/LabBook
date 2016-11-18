@@ -9,18 +9,6 @@ import (
 	"github.com/BitFunnel/LabBook/src/systems/shell"
 )
 
-type fsOperation struct {
-	opString string
-}
-
-func (fsOp *fsOperation) String() string {
-	return fmt.Sprintf("[FS] %s", fsOp.opString)
-}
-
-func newFsOperation(fsOp string) systems.Operation {
-	return &fsOperation{opString: fsOp}
-}
-
 // Open is a mockable wrapper for `os.Open`.
 func Open(name string) (*os.File, error) {
 	if systems.IsDryRun() {

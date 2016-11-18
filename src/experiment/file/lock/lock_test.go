@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -155,80 +156,80 @@ const simpleSampleSignature = "b8244d028981d693af7b456af8efa4cad63d282e19ff14942
 
 var corpusLockFile = File{
 	Signature_: simpleCorpusSignature,
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		simpleCorpusTarball: simpleCorpusTarballSignature,
 	},
 }
 var corpusLockFileEmptySig = File{
 	Signature_: "",
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		simpleCorpusTarball: simpleCorpusTarballSignature,
 	},
 }
 
 var sampleLockFile = File{
 	Signature_: simpleSampleSignature,
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		corpusKey: simpleCorpusSignature,
 	},
 }
 var sampleLockFileBrokenDep = File{
 	Signature_: simpleSampleSignature,
-	DependencySignatures_: map[string]string{
-		corpusKey: simpleCorpusSignature[5:],
+	DependencySignatures_: map[string]signature.Signature{
+		corpusKey: signature.New(simpleCorpusSignature[5:]),
 	},
 }
 var sampleLockFileBrokenSig = File{
-	Signature_: simpleSampleSignature[5:],
-	DependencySignatures_: map[string]string{
+	Signature_: signature.New(simpleSampleSignature[5:]),
+	DependencySignatures_: map[string]signature.Signature{
 		corpusKey: simpleCorpusSignature,
 	},
 }
 var sampleLockFileEmptyDep = File{
 	Signature_: simpleSampleSignature,
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		corpusKey: "",
 	},
 }
 
 var configLockFile = File{
 	Signature_: simpleConfigSignature,
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		sampleKey: simpleSampleSignature,
 	},
 }
 var configLockFileBrokenDep = File{
 	Signature_: simpleConfigSignature,
-	DependencySignatures_: map[string]string{
-		sampleKey: simpleSampleSignature[5:],
+	DependencySignatures_: map[string]signature.Signature{
+		sampleKey: signature.New(simpleSampleSignature[5:]),
 	},
 }
 var configLockFileBrokenSig = File{
-	Signature_: simpleConfigSignature[5:],
-	DependencySignatures_: map[string]string{
+	Signature_: signature.New(simpleConfigSignature[5:]),
+	DependencySignatures_: map[string]signature.Signature{
 		sampleKey: simpleSampleSignature,
 	},
 }
 
 var experimentLockFile = File{
 	Signature_: "",
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		sampleKey: simpleSampleSignature,
 		configKey: simpleConfigSignature,
 	},
 }
 var experimentLockFileBrokenDep1 = File{
 	Signature_: "",
-	DependencySignatures_: map[string]string{
-		sampleKey: simpleSampleSignature[5:],
+	DependencySignatures_: map[string]signature.Signature{
+		sampleKey: signature.New(simpleSampleSignature[5:]),
 		configKey: simpleConfigSignature,
 	},
 }
 var experimentLockFileBrokenDep2 = File{
 	Signature_: "",
-	DependencySignatures_: map[string]string{
+	DependencySignatures_: map[string]signature.Signature{
 		sampleKey: simpleSampleSignature,
-		configKey: simpleConfigSignature[5:],
+		configKey: signature.New(simpleConfigSignature[5:]),
 	},
 }
 

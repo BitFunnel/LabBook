@@ -22,7 +22,7 @@ const tmpLockFileName = ".LOCKFILE"
 // When the corpus is decompressed, this function should generate a signature
 // for all the data in the corpus, and return it. We can then later use this
 // signature to verify that the data in the corpus is what we think it is.
-type CacheCorpusOperation func() (signature string, decompressErr error)
+type CacheCorpusOperation func() (signature signature.Signature, decompressErr error)
 
 // CacheSampleOperation represents the operation of generating a cachable
 // sample of a corpus. The function should take a schema describing the sample
@@ -63,7 +63,7 @@ type Manager interface {
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
 	// TODO: Move the "fetch" part of this out of `file.Manager`. This should
 	// only manage files.
-	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error
+	FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 signature.Signature) error
 
 	// Methods that return paths we can send to BitFunnel's shell commands.
 	GetConfigRoot() string
@@ -363,7 +363,11 @@ func (m *managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) e
 // FetchMetadataAndWriteScript will fetch the metadata needed to generate a
 // script for an experiment (e.g., a query log), and then generates and writes
 // the script.
-func (m *managerContext) FetchMetadataAndWriteScript(sampleName string, queryLogURL *url.URL, queryLogSHA512 string) error {
+func (m *managerContext) FetchMetadataAndWriteScript(
+	sampleName string,
+	queryLogURL *url.URL,
+	queryLogSHA512 signature.Signature,
+) error {
 	queryLog, queryLogFetchErr := fetchFileLines(
 		queryLogURL.String(),
 		queryLogSHA512)
@@ -505,7 +509,9 @@ func (m *managerContext) releaseLockFile(
 	return nil
 }
 
-func (m *managerContext) createSignature(dataPaths []string) (string, error) {
+func (m *managerContext) createSignature(
+	dataPaths []string,
+) (signature.Signature, error) {
 	signatureAccumulator := signature.NewAccumulator()
 	for _, path := range dataPaths {
 		// TODO: This will cause -dry-run to fail because we never add teh
@@ -728,7 +734,10 @@ func (m *managerContext) getConfigPaths() ([]string, error) {
 }
 
 // TODO: Make this an actual URL.
-func fetchFileLines(url string, validationSHA512 string) ([]string, error) {
+func fetchFileLines(
+	url string,
+	validationSHA512 signature.Signature,
+) ([]string, error) {
 	resp, getErr := http.Get(url)
 	if getErr != nil {
 		return nil, getErr

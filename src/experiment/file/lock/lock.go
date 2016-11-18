@@ -1,5 +1,7 @@
 package lock
 
+import "github.com/BitFunnel/LabBook/src/signature"
+
 // TODO: Replace uses of `File` with `Manager` instead.
 
 // Manager is a general interface for managing all the information we need to
@@ -10,9 +12,9 @@ package lock
 // sample will have a signature, and the signature in that lock.File must fit
 // the signature listed here.
 type Manager interface {
-	DependencySignatures() map[string]string
-	Signature() string
-	UpdateSignature(signature string)
+	DependencySignatures() map[string]signature.Signature
+	Signature() signature.Signature
+	UpdateSignature(signature signature.Signature)
 	Name() string
 	IsLocked() bool
 }
@@ -21,8 +23,8 @@ type Manager interface {
 // interface, that centers around a YAML specification that can be serialized
 // deserialized to and from disk.
 type File struct {
-	DependencySignatures_ map[string]string `yaml:"dependency-signatures"`
-	Signature_            string            `yaml:"signature"`
+	DependencySignatures_ map[string]signature.Signature `yaml:"dependency-signatures"`
+	Signature_            signature.Signature            `yaml:"signature"`
 	name                  string
 	isLocked              bool
 }
@@ -31,17 +33,17 @@ type File struct {
 // resource being locked, and their signatures. What the keys are depends on
 // the context, and should be largly opaque, as it's not intended to be
 // manipulated. You can see the schema by looking at the `Validate*` functions.
-func (lockFile *File) DependencySignatures() map[string]string {
+func (lockFile *File) DependencySignatures() map[string]signature.Signature {
 	return lockFile.DependencySignatures_
 }
 
 // Signature returns the signature of the resource being locked.
-func (lockFile *File) Signature() string {
+func (lockFile *File) Signature() signature.Signature {
 	return lockFile.Signature_
 }
 
 // UpdateSignature updates the signature of a resource being locked.
-func (lockFile *File) UpdateSignature(signature string) {
+func (lockFile *File) UpdateSignature(signature signature.Signature) {
 	lockFile.Signature_ = signature
 }
 

@@ -13,7 +13,7 @@ import (
 // Manager is responsible for the lifecycle of the corpus, including
 // downloading, verifying, and uncompressing.
 type Manager interface {
-	Decompress() (signature string, decompressErr error)
+	Decompress() (signature signature.Signature, decompressErr error)
 	GetAllCorpusFilepaths() ([]string, error)
 }
 
@@ -35,7 +35,7 @@ func NewManager(archive []*ArchiveFile, corpusRoot string) Manager {
 
 // Decompress will decompress the corpus files that `ctx` is responsible for
 // managing.
-func (ctx *corpusContext) Decompress() (string, error) {
+func (ctx *corpusContext) Decompress() (signature.Signature, error) {
 	if ctx.decompressed {
 		return "", fmt.Errorf("Corpus at '%s' has already been uncompressed",
 			ctx.corpusRoot)

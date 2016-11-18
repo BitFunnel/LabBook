@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strings"
 
+	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/go-yaml/yaml"
 )
 
@@ -52,10 +52,10 @@ func SerializeLockFile(
 
 // NewCorpusLockFile creates a lockfile representing a cached decompressed
 // corpus.
-func NewCorpusLockFile(name string, signature string) Manager {
+func NewCorpusLockFile(name string, corpusSignature signature.Signature) Manager {
 	return &File{
-		DependencySignatures_: make(map[string]string),
-		Signature_:            signature,
+		DependencySignatures_: make(map[string]signature.Signature),
+		Signature_:            corpusSignature,
 		name:                  name,
 		isLocked:              false,
 	}
@@ -84,14 +84,14 @@ func ValidateCorpusLockFile(corpusLockFile Manager) error {
 // NewSampleLockFile creates a lockfile representing a cached corpus sample.
 func NewSampleLockFile(
 	name string,
-	signature string,
-	corpusSignature string,
+	sampleSignature signature.Signature,
+	corpusSignature signature.Signature,
 ) Manager {
 	return &File{
-		DependencySignatures_: map[string]string{
+		DependencySignatures_: map[string]signature.Signature{
 			corpusKey: corpusSignature,
 		},
-		Signature_: signature,
+		Signature_: sampleSignature,
 		name:       name,
 		isLocked:   false,
 	}
@@ -129,14 +129,14 @@ func ValidateSampleLockFile(
 // configuration.
 func NewConfigLockFile(
 	name string,
-	signature string,
-	sampleSignature string,
+	configSignature signature.Signature,
+	sampleSignature signature.Signature,
 ) Manager {
 	return &File{
-		DependencySignatures_: map[string]string{
+		DependencySignatures_: map[string]signature.Signature{
 			sampleKey: sampleSignature,
 		},
-		Signature_: signature,
+		Signature_: configSignature,
 		name:       name,
 		isLocked:   false,
 	}
@@ -218,10 +218,6 @@ func ValidateExperimentLockFile(
 // PRIVATE UTILITY FUNCTIONS.
 //
 
-func normalizeSignature(signature string) string {
-	return strings.ToLower(signature)
-}
-
 func validateDependency(
 	currentLockFile Manager,
 	dependencyLockFile Manager,
@@ -234,8 +230,8 @@ func validateDependency(
 			"dependency data", corpusKey)
 	}
 
-	expectedSignature := normalizeSignature(dependencyLockFile.Signature())
-	actualSignature := normalizeSignature(rawActualSignature)
+	expectedSignature := dependencyLockFile.Signature()
+	actualSignature := rawActualSignature
 	if expectedSignature == "" {
 		return fmt.Errorf("Attempted to parse lock file '%s', but signature "+
 			"was missing",

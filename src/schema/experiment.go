@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 
 	"github.com/BitFunnel/LabBook/src/corpus"
-	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/go-yaml/yaml"
 )
 
@@ -98,7 +97,7 @@ func (experiment *Experiment) validate() error {
 				"the mandatory field `sha512`")
 		}
 
-		chunk.SHA512 = signature.Normalize(chunk.SHA512)
+		// chunk.SHA512 = signature.Normalize(chunk.SHA512)
 	}
 
 	return nil

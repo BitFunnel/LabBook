@@ -12,8 +12,8 @@ import (
 // ArchiveFile represents a tar'd file that contains a subset of the corpus.
 // The SHA512 hash is used to verify the version of the data is correct.
 type ArchiveFile struct {
-	Name   string `yaml:"name"`
-	SHA512 string `yaml:"sha512"`
+	Name   string              `yaml:"name"`
+	SHA512 signature.Signature `yaml:"sha512"`
 }
 
 func (chunk *ArchiveFile) validate(reader io.Reader) bool {

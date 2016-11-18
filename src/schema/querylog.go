@@ -3,6 +3,8 @@ package schema
 import (
 	"errors"
 	"net/url"
+
+	"github.com/BitFunnel/LabBook/src/signature"
 )
 
 // QueryLog contains information about the query log; where to obtain it, and a
@@ -10,7 +12,7 @@ import (
 type QueryLog struct {
 	RawURL string `yaml:"raw-url"`
 	URL    *url.URL
-	SHA512 string `yaml:"sha512"`
+	SHA512 signature.Signature `yaml:"sha512"`
 }
 
 func (queryLog *QueryLog) validateAndDefault() error {

@@ -9,26 +9,22 @@ import (
 	"github.com/BitFunnel/LabBook/src/util"
 )
 
+// Accumulator accumulates a signature for a corpus by
+// repeatedly taking byte blobs of data and incorporating them into the
+// signature.
+type Accumulator interface {
+	AddData(data []byte) (dataSignature string, err error)
+	AccumulatedSignature() (accumulatedSignature string, err error)
+}
+
 type accumulatorContext struct {
 	signatureAccumulator hash.Hash
 	hasData              bool
 	err                  error
 }
 
-//
-// CorpusSignatureAccumulator
-//
-
-// CorpusSignatureAccumulator accumulates a signature for a corpus by
-// repeatedly taking tarballs from the corpus and incorporating them into the
-// signature.
-type CorpusSignatureAccumulator interface {
-	AddCorpusTarball(tarballData []byte) (string, error)
-	Signature() (string, error)
-}
-
-// NewCorpusSignatureAccumulator returns a corpus signature accumulator.
-func NewCorpusSignatureAccumulator() CorpusSignatureAccumulator {
+// NewAccumulator returns a corpus signature accumulator.
+func NewAccumulator() Accumulator {
 	return &accumulatorContext{
 		signatureAccumulator: sha512.New(),
 		hasData:              false,
@@ -36,51 +32,7 @@ func NewCorpusSignatureAccumulator() CorpusSignatureAccumulator {
 	}
 }
 
-func (ctx *accumulatorContext) Signature() (string, error) {
-	// TODO: Test this function when we have given it no data.
-	if ctx.err != nil {
-		return "", ctx.err
-	} else if ctx.hasData == false {
-		return "", errors.New("No data accumulated in signature accumulator")
-	}
-
-	return signatureString(ctx.signatureAccumulator), nil
-}
-
-func (ctx *accumulatorContext) AddCorpusTarball(tarballData []byte) (string, error) {
-	return ctx.addData(tarballData)
-}
-
-//
-// SampleSignatureAccumulator
-//
-
-// SampleSignatureAccumulator accumulates a signature for a corpus sample by
-// repeatedly taking data from the corpus and incorporating them into the
-// signature.
-type SampleSignatureAccumulator interface {
-	AddSampleData(sampleData []byte) (string, error)
-	Signature() (string, error)
-}
-
-// NewSampleSignatureAccumulator returns a sample signature accumulator.
-func NewSampleSignatureAccumulator() SampleSignatureAccumulator {
-	return &accumulatorContext{
-		signatureAccumulator: sha512.New(),
-		hasData:              false,
-		err:                  nil,
-	}
-}
-
-func (ctx *accumulatorContext) AddSampleData(sampleData []byte) (string, error) {
-	return ctx.addData(sampleData)
-}
-
-//
-// PRIVATE METHODS.
-//
-
-func (ctx *accumulatorContext) addData(data []byte) (string, error) {
+func (ctx *accumulatorContext) AddData(data []byte) (string, error) {
 	// TODO: What if `data` is empty? Do we still set this to true? This will
 	// break tests because when we call `createSignature`, if we haven't put
 	// data into the sig, it will fail.
@@ -94,6 +46,17 @@ func (ctx *accumulatorContext) addData(data []byte) (string, error) {
 	}
 
 	return signature(data)
+}
+
+func (ctx *accumulatorContext) AccumulatedSignature() (string, error) {
+	// TODO: Test this function when we have given it no data.
+	if ctx.err != nil {
+		return "", ctx.err
+	} else if ctx.hasData == false {
+		return "", errors.New("No data accumulated in signature accumulator")
+	}
+
+	return signatureString(ctx.signatureAccumulator), nil
 }
 
 //

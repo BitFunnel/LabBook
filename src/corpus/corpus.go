@@ -45,7 +45,7 @@ func (ctx *corpusContext) Decompress() (string, error) {
 	// * Acquire lock. When you're finished uncompressing, write new lock with
 	//   the signature.
 
-	signatureAccumulator := signature.NewCorpusSignatureAccumulator()
+	signatureAccumulator := signature.NewAccumulator()
 
 	for _, archiveFile := range ctx.archive {
 		archiveFilePath := ctx.getArchiveFilePath(archiveFile)
@@ -55,8 +55,7 @@ func (ctx *corpusContext) Decompress() (string, error) {
 			return "", readErr
 		}
 
-		tarballSignature, sigErr :=
-			signatureAccumulator.AddCorpusTarball(tarballData)
+		tarballSignature, sigErr := signatureAccumulator.AddData(tarballData)
 		if sigErr != nil {
 			return "", sigErr
 		} else if tarballSignature != archiveFile.SHA512 {
@@ -79,8 +78,7 @@ func (ctx *corpusContext) Decompress() (string, error) {
 		}
 	}
 
-	// TODO: Have this return the signature.
-	corpusSignature, sigErr := signatureAccumulator.Signature()
+	corpusSignature, sigErr := signatureAccumulator.AccumulatedSignature()
 	if sigErr != nil {
 		return "", sigErr
 	}

@@ -507,7 +507,7 @@ func (m *managerContext) releaseLockFile(
 }
 
 func (m *managerContext) createSignature(dataPaths []string) (string, error) {
-	signatureAccumulator := signature.NewSampleSignatureAccumulator()
+	signatureAccumulator := signature.NewAccumulator()
 	for _, path := range dataPaths {
 		// TODO: This will cause -dry-run to fail because we never add teh
 		// empty bytes to the signature, which causes the call to signature to
@@ -531,13 +531,13 @@ func (m *managerContext) createSignature(dataPaths []string) (string, error) {
 		}
 
 		// Add content to signature.
-		_, sigErr := signatureAccumulator.AddSampleData(fileBytes)
+		_, sigErr := signatureAccumulator.AddData(fileBytes)
 		if sigErr != nil {
 			return "", sigErr
 		}
 	}
 
-	return signatureAccumulator.Signature()
+	return signatureAccumulator.AccumulatedSignature()
 }
 
 // createSampleDirectories will create the directories we'll need to generate

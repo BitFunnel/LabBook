@@ -7,7 +7,7 @@ import (
 	"github.com/BitFunnel/LabBook/src/signature"
 )
 
-// TODO: Use validation step to populate a `Chunk.path` member?
+// TODO: Use validation step to populate a `ArchiveFile.path` member?
 
 // ArchiveFile represents a tar'd file that contains a subset of the corpus.
 // The SHA512 hash is used to verify the version of the data is correct.
@@ -16,11 +16,11 @@ type ArchiveFile struct {
 	FileSignature signature.Signature `yaml:"file-signature"`
 }
 
-func (chunk *ArchiveFile) validate(reader io.Reader) bool {
+func (archive *ArchiveFile) validate(reader io.Reader) bool {
 	stream, readErr := ioutil.ReadAll(reader)
 	if readErr != nil {
 		return false
 	}
 
-	return signature.ValidateData(stream, chunk.FileSignature)
+	return signature.ValidateData(stream, archive.FileSignature)
 }

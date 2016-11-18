@@ -88,16 +88,18 @@ func (experiment *Experiment) validate() error {
 		return sampleNameErr
 	}
 
-	for _, chunk := range experiment.Corpus {
-		if chunk.Name == "" {
+	for _, archiveFile := range experiment.Corpus {
+		if archiveFile.Name == "" {
 			return errors.New("Experiment schema contained a corpus without " +
 				"the mandatory field `name`")
-		} else if chunk.FileSignature == "" {
+		} else if archiveFile.FileSignature == "" {
 			return errors.New("Experiment schema contained a corpus without " +
 				"the mandatory field `sha512`")
 		}
 
-		// chunk.SHA512 = signature.Normalize(chunk.SHA512)
+		// We deserialize right to a string without calling `New`, so we need
+		// to normalize the signature.
+		archiveFile.FileSignature.Normalize()
 	}
 
 	return nil

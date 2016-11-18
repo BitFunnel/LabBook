@@ -30,7 +30,7 @@ func DeserializeLockFile(lockFileReader io.Reader, name string) (Manager, error)
 		return nil, deserializeErr
 	}
 
-	lockFile.name = name
+	lockFile.validateAndDefault(name)
 
 	return &lockFile, nil
 }

@@ -59,3 +59,16 @@ func (lockFile *File) Name() string {
 func (lockFile *File) IsLocked() bool {
 	return lockFile.isLocked
 }
+
+func (lockFile *File) validateAndDefault(name string) error {
+	lockFile.name = name
+
+	// We deserialize right to a string without calling `New`, so we need
+	// to normalize the signature.
+	lockFile.Signature_.Normalize()
+	for _, dependencySignature := range lockFile.DependencySignatures_ {
+		dependencySignature.Normalize()
+	}
+
+	return nil
+}

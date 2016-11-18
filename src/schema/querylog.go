@@ -33,5 +33,9 @@ func (queryLog *QueryLog) validateAndDefault() error {
 	}
 	queryLog.URL = queryLogURL
 
+	// We deserialize right to a string without calling `New`, so we need
+	// to normalize the signature.
+	queryLog.FileSignature.Normalize()
+
 	return nil
 }

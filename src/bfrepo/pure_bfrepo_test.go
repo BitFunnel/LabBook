@@ -30,7 +30,7 @@ func Test_SimpleClone(t *testing.T) {
 
 	// Verify.
 	cloneCmd := fmt.Sprintf(
-		`[SHELL] git clone %s %s`,
+		"[SHELL]\t\tgit clone %s %s",
 		bitfunnelHTTPSRemote,
 		os.DevNull)
 
@@ -64,34 +64,34 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 	// Verify.
 	wd, wdErr := os.Getwd()
 	assert.NoError(suite.T(), wdErr)
-	chdirCmd := fmt.Sprintf(`[FS] os.Chdir("%s")`, wd)
+	chdirCmd := fmt.Sprintf("[TRACEABLE FS]\tos.Chdir(\"%s\")", wd)
 
-	checkoutCmd := fmt.Sprintf(`[SHELL] git checkout %s`, revisionSha)
+	checkoutCmd := fmt.Sprintf("[SHELL]\t\tgit checkout %s", revisionSha)
 
 	eventLog := systems.OpLog().GetEventLog()
 	targetLog := []string{
-		`[FS] os.Chdir(".")`,
-		`[SHELL] git config --get remote.origin.url`,
+		"[TRACEABLE FS]\tos.Chdir(\".\")",
+		"[SHELL]\t\tgit config --get remote.origin.url",
 		chdirCmd,
 
-		`[FS] os.Chdir(".")`,
-		`[SHELL] git fetch origin`,
+		"[TRACEABLE FS]\tos.Chdir(\".\")",
+		"[SHELL]\t\tgit fetch origin",
 		chdirCmd,
 
-		`[FS] os.Chdir(".")`,
-		`[SHELL] git rev-parse --abbrev-ref=strict HEAD`,
+		"[TRACEABLE FS]\tos.Chdir(\".\")",
+		"[SHELL]\t\tgit rev-parse --abbrev-ref=strict HEAD",
 		chdirCmd,
 
-		`[FS] os.Chdir(".")`,
-		`[SHELL] git rev-parse HEAD`,
+		"[TRACEABLE FS]\tos.Chdir(\".\")",
+		"[SHELL]\t\tgit rev-parse HEAD",
 		chdirCmd,
 
-		`[FS] os.Chdir(".")`,
+		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		checkoutCmd,
 		chdirCmd,
 
-		`[FS] os.Chdir(".")`,
-		`[SHELL] git checkout master`,
+		"[TRACEABLE FS]\tos.Chdir(\".\")",
+		"[SHELL]\t\tgit checkout master",
 		chdirCmd,
 	}
 	labtest.AssertEventsEqual(suite.T(), targetLog, eventLog)

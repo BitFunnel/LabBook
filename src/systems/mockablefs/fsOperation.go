@@ -11,7 +11,7 @@ type fsOperation struct {
 }
 
 func (fsOp *fsOperation) String() string {
-	return fmt.Sprintf("[FS] %s", fsOp.opString)
+	return fmt.Sprintf("[MOCKABLE FS]\t%s", fsOp.opString)
 }
 
 func newFsOperation(fsOp string) systems.Operation {

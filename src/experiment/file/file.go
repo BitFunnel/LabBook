@@ -554,19 +554,14 @@ func (m *managerContext) writeLockFile(
 	lockPath string,
 	lockFile lock.Manager,
 ) error {
-	lockFileData, createErr := mockablefs.Create(lockPath)
+	createErr := mockablefs.CreateDo(
+		lockPath,
+		func(file *os.File) error {
+			return lock.SerializeLockFile(lockFile, file)
+		})
 	if createErr != nil {
-		return fmt.Errorf("Attempt to write lock file '%s' failed:\n%v", lockPath, createErr)
+		return fmt.Errorf("Attempt to serialize and write lock file '%s' failed:\n%v ", lockPath, createErr)
 	}
-	defer lockFileData.Close()
-
-	serializeErr := lock.SerializeLockFile(lockFile, lockFileData)
-	if serializeErr != nil {
-		// TODO: Consider deleting the lockfile if we can't write to it.
-		return fmt.Errorf("Attempt to serialize and write lock file '%s' failed:\n%v ", lockPath, serializeErr)
-	}
-	// TODO: Verify that other calls to `Create` use this as well.
-	lockFileData.Sync()
 
 	return nil
 }
@@ -603,40 +598,48 @@ func (m *managerContext) writeScript(manifestPaths []string, queryLog []string) 
 
 	// TODO: Check to see if this will overwrite, rather than append, if it
 	// already exists.
-	w, createErr := mockablefs.Create(m.scriptPath)
+	createErr := mockablefs.CreateDo(
+		m.scriptPath,
+		func(file *os.File) error {
+			writeErr := m.writeIngestRoutineToScript(file, manifestPaths)
+			if writeErr != nil {
+				return writeErr
+			}
+
+			writeErr = m.writeQueriesToScript(file, queryLog, true)
+			if writeErr != nil {
+				return fmt.Errorf("Failed to write script file at '%s':\n%v",
+					m.scriptPath, writeErr)
+			}
+
+			writeErr = m.writeQueriesToScript(file, queryLog, false)
+			if writeErr != nil {
+				return fmt.Errorf("Failed to write script file at '%s':\n%v",
+					m.scriptPath, writeErr)
+			}
+
+			return nil
+		})
 	if createErr != nil {
 		return createErr
 	}
-	defer w.Close()
 
+	return nil
+}
+
+func (m *managerContext) writeIngestRoutineToScript(
+	w *os.File,
+	manifestPaths []string,
+) error {
 	for _, path := range manifestPaths {
 		if path == "" {
 			continue
 		}
-		_, writeErr := w.WriteString(
-			fmt.Sprintf("cache chunk %s\n", path))
+		_, writeErr := w.WriteString(fmt.Sprintf("cache chunk %s\n", path))
 		if writeErr != nil {
 			return fmt.Errorf("Failed to write script file at '%s':\n%v",
 				m.scriptPath, writeErr)
 		}
-	}
-
-	writeErr := m.writeQueriesToScript(w, queryLog, true)
-	if writeErr != nil {
-		return fmt.Errorf("Failed to write script file at '%s':\n%v",
-			m.scriptPath, writeErr)
-	}
-
-	m.writeQueriesToScript(w, queryLog, false)
-	if writeErr != nil {
-		return fmt.Errorf("Failed to write script file at '%s':\n%v",
-			m.scriptPath, writeErr)
-	}
-
-	syncErr := w.Sync()
-	if syncErr != nil {
-		return fmt.Errorf("Failed to write script file at '%s':\n%v",
-			m.scriptPath, syncErr)
 	}
 
 	return nil

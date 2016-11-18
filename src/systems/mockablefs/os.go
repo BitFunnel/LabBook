@@ -28,7 +28,9 @@ func OpenDo(name string, action func(data []byte) error) (err error) {
 		return openErr
 	}
 	defer func() {
-		err = file.Close()
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
 	}()
 
 	data, readErr := ioutil.ReadAll(file)
@@ -47,7 +49,9 @@ func OpenDoFile(name string, action func(file *os.File) error) (err error) {
 		return openErr
 	}
 	defer func() {
-		err = file.Close()
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
 	}()
 
 	return action(file)
@@ -75,6 +79,26 @@ func Create(name string) (*os.File, error) {
 	}
 
 	return os.Create(name)
+}
+
+// CreateDo will perform `os.Create`, perform `action` on the resulting
+// file, and then sync and close that file.
+func CreateDo(name string, action func(*os.File) error) (err error) {
+	file, createErr := Create(name)
+	if createErr != nil {
+		return createErr
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	if actionErr := action(file); actionErr != nil {
+		return actionErr
+	}
+
+	return file.Sync()
 }
 
 // WriteFile is a mockable wrapper for `ioutil.WriteFile`.

@@ -8,7 +8,7 @@ import (
 )
 
 const labUsage = `Usage:
-  lab [-dry-run] run <experiment-yaml> <bitfunnelRoot> <experimentRoot> <corpusRoot>
+  lab [-simulate] [-verbose] run <experiment-yaml> <bitfunnelRoot> <experimentRoot> <corpusRoot>
 `
 
 // ParseAndDispatch parses and dispatches the command for the `lab` binary.
@@ -20,16 +20,22 @@ func ParseAndDispatch(arguments []string) {
 	userSafetyErr := checkCurrentUserSafe()
 	errors.CheckFatalB(userSafetyErr)
 
-	// TODO: This flag parsing is awful. We can't even allow -dry-run to appear
-	// last. We should replace this ASAP.
 	dryRun := flag.Bool(
-		"dry-run",
+		"simulate",
 		false,
 		"Print potentially-deleterious operations instead of performing them.")
+	verbose := flag.Bool(
+		"verbose",
+		false,
+		"Pipe all output to stdout, including output for: configuration, build, git operations, etc.")
 	flag.Parse()
 
 	if *dryRun {
 		systems.ConfigureAsDryRun()
+	}
+
+	if *verbose {
+		systems.ConfigureAsVerboseRun()
 	}
 
 	if flag.Args()[0] == "run" {

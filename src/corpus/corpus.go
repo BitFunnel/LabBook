@@ -56,9 +56,12 @@ func (ctx *corpusContext) Decompress() (signature.Signature, error) {
 		}
 
 		tarballSignature, sigErr := signatureAccumulator.AddData(tarballData)
+		signaturesAreSame := signature.NormalizeAndValidate(
+			tarballSignature,
+			archiveFile.FileSignature)
 		if sigErr != nil {
 			return "", sigErr
-		} else if tarballSignature != archiveFile.FileSignature {
+		} else if !signaturesAreSame {
 			return "", fmt.Errorf("Signature for corpus file '%s' does not "+
 				"match the hash specified in experiment YAML; it is "+
 				"possible you have specified an incorrect corpus file",

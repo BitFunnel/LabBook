@@ -26,6 +26,7 @@ func ConfigureAsDryRun() {
 	configureAsDryRunOnce.Do(func() {
 		dryRun = true
 	})
+	ConfigureAsTraceRun()
 }
 
 // IsDryRun reports whether this is meant to be a dry run (i.e., whether
@@ -52,6 +53,25 @@ func ConfigureAsTestRun() {
 // IsTestRun reports whether this is meant to be a test run.
 func IsTestRun() bool {
 	return testRun
+}
+
+//
+// TRACEABLE STATICS CONFIGURATION.
+//
+
+var traceRun = false
+var configureAsTraceRunOnce sync.Once
+
+// ConfigureAsTraceRun sets the system to not perform deleterious effects.
+func ConfigureAsTraceRun() {
+	configureAsTraceRunOnce.Do(func() {
+		traceRun = true
+	})
+}
+
+// IsTraceRun reports whether this is meant to be a test run.
+func IsTraceRun() bool {
+	return traceRun
 }
 
 //

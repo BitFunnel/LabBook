@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+
+	"github.com/BitFunnel/LabBook/src/systems"
 )
 
 // Accumulator accumulates a signature for a corpus by
@@ -50,7 +52,10 @@ func (ctx *accumulatorContext) AccumulatedSignature() (Signature, error) {
 	// TODO: Test this function when we have given it no data.
 	if ctx.err != nil {
 		return "", ctx.err
-	} else if ctx.hasData == false {
+	} else if ctx.hasData == false && !systems.IsDryRun() {
+		// NOTE: In dry runs, we will sometimes expect to have generated a
+		// signature on a mocked (i.e., empty) file. In this case, we can
+		// safely ignore this error, since dry runs do not validate data.
 		return "", errors.New("No data accumulated in signature accumulator")
 	}
 

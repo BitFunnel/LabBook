@@ -1,11 +1,11 @@
 package cli
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/BitFunnel/LabBook/src/cli/errors"
 	"github.com/BitFunnel/LabBook/src/experiment"
+	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
 
 const labRunUsage = `Usage:
@@ -32,7 +32,7 @@ func labRun(arguments []string) {
 	errors.CheckFatalB(safetyErr)
 
 	// Get schema file.
-	schemaFile, fErr := os.Open(schemaPath)
+	schemaFile, fErr := traceablefs.Open(schemaPath)
 	errors.CheckFatalB(fErr)
 	defer schemaFile.Close()
 

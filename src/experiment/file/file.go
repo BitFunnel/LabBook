@@ -12,6 +12,7 @@ import (
 	"github.com/BitFunnel/LabBook/src/experiment/file/lock"
 	"github.com/BitFunnel/LabBook/src/schema"
 	"github.com/BitFunnel/LabBook/src/signature"
+	"github.com/BitFunnel/LabBook/src/systems/mockablefs"
 	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
 
@@ -345,13 +346,13 @@ func (m *managerContext) UpdateSampleCache(samples []*schema.Sample, createSampl
 // WriteConfigManifestFile takes a list of absolute paths to corpus files, and
 // writes them to the manifest file.
 func (m *managerContext) WriteConfigManifestFile(absoluteCorpusPaths []string) error {
-	mkConfigRootErr := traceablefs.MkdirAll(m.configRoot, 0777)
+	mkConfigRootErr := mockablefs.MkdirAll(m.configRoot, 0777)
 	if mkConfigRootErr != nil {
 		return mkConfigRootErr
 	}
 
 	fileBytes := []byte(strings.Join(absoluteCorpusPaths, "\n"))
-	writeErr := traceablefs.WriteFile(m.configManifestPath, fileBytes, 0666)
+	writeErr := mockablefs.WriteFile(m.configManifestPath, fileBytes, 0666)
 	if writeErr != nil {
 		return fmt.Errorf("Failed to write configuration manifest file at "+
 			"'%s':\n%v", m.configManifestPath, writeErr)
@@ -514,9 +515,6 @@ func (m *managerContext) createSignature(
 ) (signature.Signature, error) {
 	signatureAccumulator := signature.NewAccumulator()
 	for _, path := range dataPaths {
-		// TODO: This will cause -dry-run to fail because we never add teh
-		// empty bytes to the signature, which causes the call to signature to
-		// fail.
 		if path == "" {
 			continue
 		}
@@ -524,7 +522,7 @@ func (m *managerContext) createSignature(
 		// TODO: Probably we want to move this to some method.
 
 		// Get content.
-		file, openErr := traceablefs.Open(path)
+		file, openErr := mockablefs.Open(path)
 		if openErr != nil {
 			return "", fmt.Errorf("Attempted to create signature for data, but failed to open path '%s':\n%v", path, openErr)
 		}
@@ -551,7 +549,7 @@ func (m *managerContext) createSignature(
 // directories for each.
 func (m *managerContext) createSampleDirectories() error {
 	for _, samplePath := range m.samplePaths {
-		mkdirFilteredCorpusRoot := traceablefs.MkdirAll(samplePath, 0777)
+		mkdirFilteredCorpusRoot := mockablefs.MkdirAll(samplePath, 0777)
 		if mkdirFilteredCorpusRoot != nil {
 			return fmt.Errorf("Unable to create filtered corpus directory "+
 				"'%s':\n%v", samplePath, mkdirFilteredCorpusRoot)
@@ -565,7 +563,7 @@ func (m *managerContext) writeLockFile(
 	lockPath string,
 	lockFile lock.Manager,
 ) error {
-	lockFileData, createErr := traceablefs.Create(lockPath)
+	lockFileData, createErr := mockablefs.Create(lockPath)
 	if createErr != nil {
 		return fmt.Errorf("Attempt to write lock file '%s' failed:\n%v", lockPath, createErr)
 	}
@@ -585,7 +583,7 @@ func (m *managerContext) writeLockFile(
 func (m *managerContext) readLockFile(
 	lockPath string,
 ) (lock.Manager, error) {
-	lockFileData, readErr := traceablefs.Open(lockPath)
+	lockFileData, readErr := mockablefs.Open(lockPath)
 	if readErr != nil {
 		return nil, fmt.Errorf("Attempted to read lock file '%s', but failed:\n%v", lockPath, readErr)
 	}
@@ -600,22 +598,22 @@ func (m *managerContext) readLockFile(
 }
 
 func (m *managerContext) writeScript(manifestPaths []string, queryLog []string) error {
-	mkdirErr := traceablefs.MkdirAll(m.configRoot, 0777)
+	mkdirErr := mockablefs.MkdirAll(m.configRoot, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
-	mkdirErr = traceablefs.MkdirAll(m.verifyOutPath, 0777)
+	mkdirErr = mockablefs.MkdirAll(m.verifyOutPath, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
-	mkdirErr = traceablefs.MkdirAll(m.noVerifyOutPath, 0777)
+	mkdirErr = mockablefs.MkdirAll(m.noVerifyOutPath, 0777)
 	if mkdirErr != nil {
 		return mkdirErr
 	}
 
 	// TODO: Check to see if this will overwrite, rather than append, if it
 	// already exists.
-	w, createErr := traceablefs.Create(m.scriptPath)
+	w, createErr := mockablefs.Create(m.scriptPath)
 	if createErr != nil {
 		return createErr
 	}
@@ -763,7 +761,7 @@ func fetchFileLines(
 }
 
 func readFileLines(path string) ([]string, error) {
-	file, openErr := traceablefs.Open(path)
+	file, openErr := mockablefs.Open(path)
 	if openErr != nil {
 		return nil, openErr
 	}

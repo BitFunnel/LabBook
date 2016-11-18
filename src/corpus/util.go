@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/BitFunnel/LabBook/src/systems/mockablefs"
 	"github.com/BitFunnel/LabBook/src/util"
 )
 
@@ -13,7 +14,7 @@ func getArchiveFileData(archivePath string) ([]byte, error) {
 		return nil, fmt.Errorf("Corpus file '%s' does not exist.", archivePath)
 	}
 
-	archiveFile, openErr := os.Open(archivePath)
+	archiveFile, openErr := mockablefs.Open(archivePath)
 	if openErr != nil {
 		return nil, openErr
 	}

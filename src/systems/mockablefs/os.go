@@ -20,6 +20,39 @@ func Open(name string) (*os.File, error) {
 	return os.Open(name)
 }
 
+// OpenDo will open a file, retrieve all data from it, perform `action` on that
+// data, and then close the file.
+func OpenDo(name string, action func(data []byte) error) (err error) {
+	file, openErr := Open(name)
+	if openErr != nil {
+		return openErr
+	}
+	defer func() {
+		err = file.Close()
+	}()
+
+	data, readErr := ioutil.ReadAll(file)
+	if readErr != nil {
+		return readErr
+	}
+
+	return action(data)
+}
+
+// OpenDoFile will open a file, perform `action` on that file, and then close
+// it.
+func OpenDoFile(name string, action func(file *os.File) error) (err error) {
+	file, openErr := Open(name)
+	if openErr != nil {
+		return openErr
+	}
+	defer func() {
+		err = file.Close()
+	}()
+
+	return action(file)
+}
+
 // MkdirAll is a mockable wrapper for `os.MkdirAll`.
 func MkdirAll(path string, perm os.FileMode) error {
 	if systems.IsDryRun() {

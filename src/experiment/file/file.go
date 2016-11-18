@@ -519,24 +519,15 @@ func (m *managerContext) createSignature(
 			continue
 		}
 
-		// TODO: Probably we want to move this to some method.
-
 		// Get content.
-		file, openErr := mockablefs.Open(path)
+		openErr := mockablefs.OpenDo(
+			path,
+			func(fileBytes []byte) (sigErr error) {
+				_, sigErr = signatureAccumulator.AddData(fileBytes)
+				return
+			})
 		if openErr != nil {
-			return "", fmt.Errorf("Attempted to create signature for data, but failed to open path '%s':\n%v", path, openErr)
-		}
-		defer file.Close()
-
-		fileBytes, readErr := ioutil.ReadAll(file)
-		if readErr != nil {
-			return "", fmt.Errorf("Attempted to create signature for data, but failed to read file at path '%s':\n%v", path, readErr)
-		}
-
-		// Add content to signature.
-		_, sigErr := signatureAccumulator.AddData(fileBytes)
-		if sigErr != nil {
-			return "", sigErr
+			return "", fmt.Errorf("Attempted to create signature for data at path '%s', but failed:\n%v", path, openErr)
 		}
 	}
 
@@ -582,19 +573,18 @@ func (m *managerContext) writeLockFile(
 
 func (m *managerContext) readLockFile(
 	lockPath string,
-) (lock.Manager, error) {
-	lockFileData, readErr := mockablefs.Open(lockPath)
-	if readErr != nil {
-		return nil, fmt.Errorf("Attempted to read lock file '%s', but failed:\n%v", lockPath, readErr)
+) (lockFile lock.Manager, err error) {
+	openErr := mockablefs.OpenDoFile(
+		lockPath,
+		func(file *os.File) error {
+			lockFile, err = lock.DeserializeLockFile(file, lockPath)
+			return err
+		})
+	if openErr != nil {
+		return nil, fmt.Errorf("Attempted to read lock file '%s', but failed:\n%v", lockPath, openErr)
 	}
-	defer lockFileData.Close()
 
-	lockFile, deserErr := lock.DeserializeLockFile(lockFileData, lockPath)
-	if deserErr != nil {
-		return nil, fmt.Errorf("Attempted to read and deserialize lock file '%s', but failed:\n%v", lockPath, deserErr)
-	}
-
-	return lockFile, nil
+	return
 }
 
 func (m *managerContext) writeScript(manifestPaths []string, queryLog []string) error {
@@ -760,17 +750,16 @@ func fetchFileLines(
 	return lines, nil
 }
 
-func readFileLines(path string) ([]string, error) {
-	file, openErr := mockablefs.Open(path)
+func readFileLines(path string) (lines []string, err error) {
+	openErr := mockablefs.OpenDo(
+		path,
+		func(fileBytes []byte) error {
+			lines = strings.Split(string(fileBytes), "\n")
+			return nil
+		})
 	if openErr != nil {
 		return nil, openErr
 	}
-	defer file.Close()
 
-	fileBytes, readErr := ioutil.ReadAll(file)
-	if readErr != nil {
-		return nil, readErr
-	}
-
-	return strings.Split(string(fileBytes), "\n"), nil
+	return
 }

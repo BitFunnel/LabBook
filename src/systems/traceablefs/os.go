@@ -87,10 +87,5 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error {
 
 // chdir is a traceable wrapper for `os.Chdir`.
 func chdir(dir string) error {
-	if systems.IsTraceRun() {
-		operationText := fmt.Sprintf(`os.Chdir("%s")`, dir)
-		systems.OpLog().Log(newFsOperation(operationText))
-	}
-
 	return os.Chdir(dir)
 }

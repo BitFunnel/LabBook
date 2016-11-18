@@ -62,37 +62,16 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 	}
 
 	// Verify.
-	wd, wdErr := os.Getwd()
-	assert.NoError(suite.T(), wdErr)
-	chdirCmd := fmt.Sprintf("[TRACEABLE FS]\tos.Chdir(\"%s\")", wd)
-
 	checkoutCmd := fmt.Sprintf("[SHELL]\t\tgit -c advice.detachedHead=false checkout %s", revisionSha)
 
 	eventLog := systems.OpLog().GetEventLog()
 	targetLog := []string{
-		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		"[SHELL]\t\tgit config --get remote.origin.url",
-		chdirCmd,
-
-		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		"[SHELL]\t\tgit fetch origin",
-		chdirCmd,
-
-		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		"[SHELL]\t\tgit rev-parse --abbrev-ref=strict HEAD",
-		chdirCmd,
-
-		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		"[SHELL]\t\tgit rev-parse HEAD",
-		chdirCmd,
-
-		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		checkoutCmd,
-		chdirCmd,
-
-		"[TRACEABLE FS]\tos.Chdir(\".\")",
 		"[SHELL]\t\tgit -c advice.detachedHead=false checkout master",
-		chdirCmd,
 	}
 	labtest.AssertEventsEqual(suite.T(), targetLog, eventLog)
 }

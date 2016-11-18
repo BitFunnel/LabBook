@@ -2,30 +2,28 @@ package corpus
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/BitFunnel/LabBook/src/systems/mockablefs"
 	"github.com/BitFunnel/LabBook/src/util"
 )
 
-func getArchiveFileData(archivePath string) ([]byte, error) {
+func getArchiveFileData(archivePath string) (archiveData []byte, err error) {
 	if !util.Exists(archivePath) {
 		return nil, fmt.Errorf("Corpus file '%s' does not exist.", archivePath)
 	}
 
-	archiveFile, openErr := mockablefs.Open(archivePath)
+	openErr := mockablefs.OpenDo(
+		archivePath,
+		func(archiveFileData []byte) error {
+			archiveData = archiveFileData
+			return nil
+		})
 	if openErr != nil {
-		return nil, openErr
-	}
-	defer archiveFile.Close()
-
-	archiveFileStream, readErr := ioutil.ReadAll(archiveFile)
-	if readErr != nil {
 		return nil, fmt.Errorf("Failed to read corpus file '%s'", archivePath)
 	}
 
-	return archiveFileStream, nil
+	return
 }
 
 func corpusFileVisitor(corpusFiles *[]string, path string, fileInfo os.FileInfo, err error) error {

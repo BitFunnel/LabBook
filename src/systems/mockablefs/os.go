@@ -8,8 +8,8 @@ import (
 	"github.com/BitFunnel/LabBook/src/systems"
 )
 
-// Open is a mockable wrapper for `os.Open`.
-func Open(name string) (*os.File, error) {
+// open is a mockable wrapper for `os.Open`.
+func open(name string) (*os.File, error) {
 	if systems.IsDryRun() {
 		operationText := fmt.Sprintf(`os.Open("%s")`, name)
 		systems.OpLog().Log(newFsOperation(operationText))
@@ -23,7 +23,7 @@ func Open(name string) (*os.File, error) {
 // OpenDo will open a file, retrieve all data from it, perform `action` on that
 // data, and then close the file.
 func OpenDo(name string, action func(data []byte) error) (err error) {
-	file, openErr := Open(name)
+	file, openErr := open(name)
 	if openErr != nil {
 		return openErr
 	}
@@ -44,7 +44,7 @@ func OpenDo(name string, action func(data []byte) error) (err error) {
 // OpenDoFile will open a file, perform `action` on that file, and then close
 // it.
 func OpenDoFile(name string, action func(file *os.File) error) (err error) {
-	file, openErr := Open(name)
+	file, openErr := open(name)
 	if openErr != nil {
 		return openErr
 	}
@@ -69,8 +69,8 @@ func MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
 
-// Create is a mockable wrapper for `os.Create`.
-func Create(name string) (*os.File, error) {
+// create is a mockable wrapper for `os.Create`.
+func create(name string) (*os.File, error) {
 	if systems.IsDryRun() {
 		operationText := fmt.Sprintf(`os.Create("%s")`, name)
 		systems.OpLog().Log(newFsOperation(operationText))
@@ -84,7 +84,7 @@ func Create(name string) (*os.File, error) {
 // CreateDo will perform `os.Create`, perform `action` on the resulting
 // file, and then sync and close that file.
 func CreateDo(name string, action func(*os.File) error) (err error) {
-	file, createErr := Create(name)
+	file, createErr := create(name)
 	if createErr != nil {
 		return createErr
 	}

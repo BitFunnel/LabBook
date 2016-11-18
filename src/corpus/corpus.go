@@ -2,14 +2,12 @@ package corpus
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/BitFunnel/LabBook/src/signature"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
-	"github.com/BitFunnel/LabBook/src/util"
 )
 
 // Manager is responsible for the lifecycle of the corpus, including
@@ -19,11 +17,17 @@ type Manager interface {
 	GetAllCorpusFilepaths() ([]string, error)
 }
 
+type corpusContext struct {
+	archive      []*ArchiveFile
+	corpusRoot   string
+	decompressed bool
+}
+
 // NewManager makes a `Manager`, which can be used to govern the lifecycle of a
 // corpus directory.
-func NewManager(chunks []*Chunk, corpusRoot string) Manager {
+func NewManager(archive []*ArchiveFile, corpusRoot string) Manager {
 	return &corpusContext{
-		chunks:       chunks,
+		archive:      archive,
 		corpusRoot:   corpusRoot,
 		decompressed: false,
 	}
@@ -43,10 +47,10 @@ func (ctx *corpusContext) Decompress() (string, error) {
 
 	signatureAccumulator := signature.NewCorpusSignatureAccumulator()
 
-	for _, chunk := range ctx.chunks {
-		chunkPath := ctx.getChunkPath(chunk)
+	for _, archiveFile := range ctx.archive {
+		archiveFilePath := ctx.getArchiveFilePath(archiveFile)
 
-		tarballData, readErr := getCompressedChunkData(chunkPath)
+		tarballData, readErr := getArchiveFileData(archiveFilePath)
 		if readErr != nil {
 			return "", readErr
 		}
@@ -55,11 +59,11 @@ func (ctx *corpusContext) Decompress() (string, error) {
 			signatureAccumulator.AddCorpusTarball(tarballData)
 		if sigErr != nil {
 			return "", sigErr
-		} else if tarballSignature != chunk.SHA512 {
+		} else if tarballSignature != archiveFile.SHA512 {
 			return "", fmt.Errorf("Signature for corpus file '%s' does not "+
 				"match the hash specified in experiment YAML; it is "+
 				"possible you have specified an incorrect corpus file",
-				chunkPath)
+				archiveFilePath)
 		}
 
 		// TODO: Probably we can avoid un-taring this all the time, and also
@@ -67,7 +71,7 @@ func (ctx *corpusContext) Decompress() (string, error) {
 		tarErr := shell.RunCommand(
 			"tar",
 			"-xf",
-			chunkPath,
+			archiveFilePath,
 			"-C",
 			ctx.corpusRoot)
 		if tarErr != nil {
@@ -138,67 +142,6 @@ func (ctx *corpusContext) GetAllCorpusFilepaths() ([]string, error) {
 //
 // PRIVATE METHODS.
 //
-func (ctx *corpusContext) getChunkPath(chunk *Chunk) string {
-	return filepath.Join(ctx.corpusRoot, chunk.Name)
-}
-
-//
-// PRIVATE FUNCTIONS.
-//
-
-func getCompressedChunkData(chunkPath string) ([]byte, error) {
-	if !util.Exists(chunkPath) {
-		return nil, fmt.Errorf("Corpus file '%s' does not exist.", chunkPath)
-	}
-
-	chunkFile, openErr := os.Open(chunkPath)
-	if openErr != nil {
-		return nil, openErr
-	}
-	defer chunkFile.Close()
-
-	chunkStream, readErr := ioutil.ReadAll(chunkFile)
-	if readErr != nil {
-		return nil, fmt.Errorf("Failed to read corpus file '%s'", chunkPath)
-	}
-
-	return chunkStream, nil
-}
-
-func corpusFileVisitor(corpusFiles *[]string, path string, fileInfo os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
-
-	if !fileInfo.IsDir() {
-		*corpusFiles = append(*corpusFiles, path)
-	}
-
-	return nil
-}
-
-func (chunk *Chunk) validate(reader io.Reader) bool {
-	stream, readErr := ioutil.ReadAll(reader)
-	if readErr != nil {
-		return false
-	}
-
-	return util.ValidateSHA512(stream, chunk.SHA512)
-}
-
-type corpusContext struct {
-	chunks       []*Chunk
-	corpusRoot   string
-	decompressed bool
-}
-
-// TODO: Put `Chunk` in its own file?
-// TODO: Use validation step to populate a `Chunk.path` member?
-// TODO: Rename `Chunk`. It's not a chunk, it's a raw corpus tarball.
-
-// Chunk represents a tar'd file that contains a subset of the corpus. the
-// SHA512 hash is used to verify the version of the data is correct.
-type Chunk struct {
-	Name   string `yaml:"name"`
-	SHA512 string `yaml:"sha512"`
+func (ctx *corpusContext) getArchiveFilePath(archiveFile *ArchiveFile) string {
+	return filepath.Join(ctx.corpusRoot, archiveFile.Name)
 }

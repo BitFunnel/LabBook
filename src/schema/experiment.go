@@ -18,13 +18,13 @@ import (
 // exist. This is because the zero values of these parameters are valid
 // configuration settings.
 type Experiment struct {
-	BitFunnelSha     string            `yaml:"bitfunnel-commit-hash"`
-	LabBookVersion   string            `yaml:"lab-book-version"`
-	QueryLog         *QueryLog         `yaml:"query-log"`
-	Corpus           []*corpus.Chunk   `yaml:"corpus"`
-	Samples          []*Sample         `yaml:"samples"`
-	StatisticsConfig *StatisticsConfig `yaml:"statistics-config"`
-	RuntimeConfig    *RuntimeConfig    `yaml:"runtime-config"`
+	BitFunnelSha     string                `yaml:"bitfunnel-commit-hash"`
+	LabBookVersion   string                `yaml:"lab-book-version"`
+	QueryLog         *QueryLog             `yaml:"query-log"`
+	Corpus           []*corpus.ArchiveFile `yaml:"corpus"`
+	Samples          []*Sample             `yaml:"samples"`
+	StatisticsConfig *StatisticsConfig     `yaml:"statistics-config"`
+	RuntimeConfig    *RuntimeConfig        `yaml:"runtime-config"`
 }
 
 // DeserializeExperimentSchema deserializes an `Schema` from an `io.Reader`.

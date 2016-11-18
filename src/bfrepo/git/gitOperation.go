@@ -11,7 +11,7 @@ type gitOperation struct {
 }
 
 func (gitOp *gitOperation) String() string {
-	return fmt.Sprintf("[GIT]\t\t%s", gitOp.opString)
+	return fmt.Sprintf("[GIT]          %s", gitOp.opString)
 }
 
 func newGitOperation(gitOp string) systems.Operation {

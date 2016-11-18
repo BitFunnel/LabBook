@@ -30,7 +30,7 @@ func Test_SimpleClone(t *testing.T) {
 
 	// Verify.
 	cloneCmd := fmt.Sprintf(
-		"[SHELL]\t\tgit clone %s %s",
+		"[SHELL]        git clone %s %s",
 		bitfunnelHTTPSRemote,
 		os.DevNull)
 
@@ -62,16 +62,16 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 	}
 
 	// Verify.
-	checkoutCmd := fmt.Sprintf("[SHELL]\t\tgit -c advice.detachedHead=false checkout %s", revisionSha)
+	checkoutCmd := fmt.Sprintf("[SHELL]        git -c advice.detachedHead=false checkout %s", revisionSha)
 
 	eventLog := systems.OpLog().GetEventLog()
 	targetLog := []string{
-		"[SHELL]\t\tgit config --get remote.origin.url",
-		"[SHELL]\t\tgit fetch origin",
-		"[SHELL]\t\tgit rev-parse --abbrev-ref=strict HEAD",
-		"[SHELL]\t\tgit rev-parse HEAD",
+		"[SHELL]        git config --get remote.origin.url",
+		"[SHELL]        git fetch origin",
+		"[SHELL]        git rev-parse --abbrev-ref=strict HEAD",
+		"[SHELL]        git rev-parse HEAD",
 		checkoutCmd,
-		"[SHELL]\t\tgit -c advice.detachedHead=false checkout master",
+		"[SHELL]        git -c advice.detachedHead=false checkout master",
 	}
 	labtest.AssertEventsEqual(suite.T(), targetLog, eventLog)
 }

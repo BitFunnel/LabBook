@@ -11,7 +11,7 @@ type bfOperation struct {
 }
 
 func (bfOp *bfOperation) String() string {
-	return fmt.Sprintf("[BitFunnel]\t%s", bfOp.opString)
+	return fmt.Sprintf("[BitFunnel]    %s", bfOp.opString)
 }
 
 func newBfOperation(bfOp string) systems.Operation {

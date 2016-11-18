@@ -17,7 +17,7 @@ type shellOperation struct {
 func (shellOp *shellOperation) String() string {
 	// TODO: Probably we need to check the size of tab to make this perfect
 	// everywhere.
-	return fmt.Sprintf("[SHELL]\t\t%s %s", shellOp.command, strings.Join(shellOp.args, " "))
+	return fmt.Sprintf("[SHELL]        %s %s", shellOp.command, strings.Join(shellOp.args, " "))
 }
 
 func newShellOperation(command string, args []string) systems.Operation {

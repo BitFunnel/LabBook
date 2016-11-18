@@ -11,7 +11,7 @@ type fsOperation struct {
 }
 
 func (fsOp *fsOperation) String() string {
-	return fmt.Sprintf("[TRACEABLE FS]\t%s", fsOp.opString)
+	return fmt.Sprintf("[TRACEABLE FS] %s", fsOp.opString)
 }
 
 func newFsOperation(fsOp string) systems.Operation {

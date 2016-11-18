@@ -3,6 +3,7 @@ package git
 import (
 	"fmt"
 
+	"github.com/BitFunnel/LabBook/src/systems"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
 	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
@@ -82,6 +83,14 @@ func (repo *repoContext) GetRepoRootPath() string {
 
 // Clone runs `git clone` in a shell.
 func (repo *repoContext) CloneFromOrigin() error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			`Cloning from '%s' in directory '%s'`,
+			repo.originRemoteURL,
+			repo.GetRepoRootPath())
+		systems.OpLog().Log(newGitOperation(operation))
+	}
+
 	return shell.RunCommand(
 		gitCommand,
 		"clone",
@@ -110,6 +119,14 @@ func (repo *repoContext) GetConfig(variable string) (configOut string, configErr
 
 // Fetch runs the `git fetch` command in a shell.
 func (repo *repoContext) Fetch(remote string) error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			`Fetching from remote '%s' in directory '%s'`,
+			remote,
+			repo.GetRepoRootPath())
+		systems.OpLog().Log(newGitOperation(operation))
+	}
+
 	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return chdirErr
@@ -164,11 +181,26 @@ func (repo *repoContext) GetRevParseRef(ref string) (revParse string, revparseEr
 
 // Checkout runs the `git checkout` command in a shell.
 func (repo *repoContext) Checkout(sha string) error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			`Checking out remote '%s' in directory '%s'`,
+			sha,
+			repo.GetRepoRootPath())
+		systems.OpLog().Log(newGitOperation(operation))
+	}
+
 	chdirHandle, chdirErr := traceablefs.ScopedChdir(repo.repoRoot)
 	if chdirErr != nil {
 		return chdirErr
 	}
 	defer chdirHandle.Dispose()
 
-	return shell.RunCommand(gitCommand, "checkout", sha)
+	// Run `git checkout`, suppressing the warning about detached head, since
+	// it does not benefit our users.
+	return shell.RunCommand(
+		gitCommand,
+		"-c",
+		"advice.detachedHead=false",
+		"checkout",
+		sha)
 }

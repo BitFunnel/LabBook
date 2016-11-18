@@ -42,7 +42,7 @@ func RunCommand(command string, args ...string) error {
 	}
 
 	cmd := exec.Command(command, args...)
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = systems.OutputFile()
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/BitFunnel/LabBook/src/bfrepo/git"
+	"github.com/BitFunnel/LabBook/src/systems"
 	"github.com/BitFunnel/LabBook/src/systems/shell"
 	"github.com/BitFunnel/LabBook/src/systems/traceablefs"
 )
@@ -129,6 +130,13 @@ func (repo *bfRepoContext) Checkout(sha string) (shell.CmdHandle, error) {
 // Configure switches to the directory of the BitFunnel root, and runs
 // the configuration script that generates a makefile.
 func (repo *bfRepoContext) ConfigureBuild() error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			`Configuring BitFunnel to build in directory '%s'`,
+			repo.buildRoot)
+		systems.OpLog().Log(newBfOperation(operation))
+	}
+
 	chdirHandle, chdirErr :=
 		traceablefs.ScopedChdir(repo.gitRepo.GetRepoRootPath())
 	if chdirErr != nil {
@@ -142,6 +150,13 @@ func (repo *bfRepoContext) ConfigureBuild() error {
 
 // Build switches to the BitFunnel build directory, and builds the code.
 func (repo *bfRepoContext) Build() error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			`Building BitFunnel in directory '%s'`,
+			repo.buildRoot)
+		systems.OpLog().Log(newBfOperation(operation))
+	}
+
 	chdirHandle, chdirErr :=
 		traceablefs.ScopedChdir(repo.buildRoot)
 	if chdirErr != nil {
@@ -164,6 +179,14 @@ func (repo *bfRepoContext) RunFilter(configManifestPath string, samplePath strin
 		arguments,
 		sampleArgs...)
 
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			"Creating corpus samples with command: `%s filter %s`",
+			repo.bitFunnelExecutable,
+			arguments)
+		systems.OpLog().Log(newBfOperation(operation))
+	}
+
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		arguments...)
@@ -171,6 +194,15 @@ func (repo *bfRepoContext) RunFilter(configManifestPath string, samplePath strin
 
 // RunStatistics runs the `statistics` command in the BitFunnel executable tool.
 func (repo *bfRepoContext) RunStatistics(statsManifestPath string, configDir string) error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			"Configuring BitFunnel runtime with command: `%s statistics %s %s -text`",
+			repo.bitFunnelExecutable,
+			statsManifestPath,
+			configDir)
+		systems.OpLog().Log(newBfOperation(operation))
+	}
+
 	// TODO: Check that this is configured.
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
@@ -182,6 +214,14 @@ func (repo *bfRepoContext) RunStatistics(statsManifestPath string, configDir str
 
 // RunTermTable runs the `termtable` command in the BitFunnel executable tool.
 func (repo *bfRepoContext) RunTermTable(configDir string) error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			"Configuring BitFunnel runtime with command: `%s termtable %s`",
+			repo.bitFunnelExecutable,
+			configDir)
+		systems.OpLog().Log(newBfOperation(operation))
+	}
+
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"termtable",
@@ -190,6 +230,15 @@ func (repo *bfRepoContext) RunTermTable(configDir string) error {
 
 // RunRepl runs the BitFunnel repl.
 func (repo *bfRepoContext) RunRepl(configDir string, scriptFile string) error {
+	if !systems.IsDryRun() {
+		operation := fmt.Sprintf(
+			"Running experiment: `%s repl %s -script %s`",
+			repo.bitFunnelExecutable,
+			configDir,
+			scriptFile)
+		systems.OpLog().Log(newBfOperation(operation))
+	}
+
 	return shell.RunCommand(
 		repo.bitFunnelExecutable,
 		"repl",

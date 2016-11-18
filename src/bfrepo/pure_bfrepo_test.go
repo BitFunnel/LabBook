@@ -66,7 +66,7 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 	assert.NoError(suite.T(), wdErr)
 	chdirCmd := fmt.Sprintf("[TRACEABLE FS]\tos.Chdir(\"%s\")", wd)
 
-	checkoutCmd := fmt.Sprintf("[SHELL]\t\tgit checkout %s", revisionSha)
+	checkoutCmd := fmt.Sprintf("[SHELL]\t\tgit -c advice.detachedHead=false checkout %s", revisionSha)
 
 	eventLog := systems.OpLog().GetEventLog()
 	targetLog := []string{
@@ -91,7 +91,7 @@ func (suite *LabBookTest) Test_FetchCheckout() {
 		chdirCmd,
 
 		"[TRACEABLE FS]\tos.Chdir(\".\")",
-		"[SHELL]\t\tgit checkout master",
+		"[SHELL]\t\tgit -c advice.detachedHead=false checkout master",
 		chdirCmd,
 	}
 	labtest.AssertEventsEqual(suite.T(), targetLog, eventLog)

@@ -1,8 +1,6 @@
 package experiment
 
 import (
-	"fmt"
-
 	"github.com/BitFunnel/LabBook/src/bfrepo"
 	"github.com/BitFunnel/LabBook/src/experiment/file"
 	"github.com/BitFunnel/LabBook/src/schema"
@@ -67,24 +65,26 @@ func configureBitFunnelRuntime(repo bfrepo.Manager, fileManager file.Manager, ex
 	}
 
 	// Generate corpus statistics.
-	statsManifestPath, ok := fileManager.GetSampleManifestPath(
-		exptSchema.StatisticsConfig.SampleName)
-	if !ok {
-		return fmt.Errorf("Statistics configuration requires sample with "+
-			"name '%s', but a sample with that name was not found in "+
-			"experiment schema", exptSchema.StatisticsConfig.SampleName)
-	}
-	statisticsErr := repo.RunStatistics(
-		statsManifestPath,
-		fileManager.GetConfigRoot())
-	if statisticsErr != nil {
-		return statisticsErr
-	}
+	configErr := fileManager.InitConfigCache(
+		exptSchema.StatisticsConfig.SampleName,
+		func(configRoot string, statsManifestPath string) error {
+			statisticsErr := repo.RunStatistics(
+				statsManifestPath,
+				configRoot)
+			if statisticsErr != nil {
+				return statisticsErr
+			}
 
-	// Generate term table.
-	termTableErr := repo.RunTermTable(fileManager.GetConfigRoot())
-	if termTableErr != nil {
-		return termTableErr
+			// Generate term table.
+			termTableErr := repo.RunTermTable(configRoot)
+			if termTableErr != nil {
+				return termTableErr
+			}
+
+			return nil
+		})
+	if configErr != nil {
+		return configErr
 	}
 
 	return nil

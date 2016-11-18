@@ -202,6 +202,23 @@ func ValidateSampleLockFile(
 	return nil
 }
 
+// NewConfigLockFile creates a lockfile representing a cached BitFunnel runtime
+// configuration.
+func NewConfigLockFile(
+	name string,
+	signature string,
+	sampleSignature string,
+) Manager {
+	return &File{
+		DependencySignatures_: map[string]string{
+			sampleKey: sampleSignature,
+		},
+		Signature_: signature,
+		name:       name,
+		isLocked:   false,
+	}
+}
+
 // ValidateConfigLockFile will deserialize and validate the lockfile for a
 // BitFunnel runtime configuration, and validate it against the sample lockfile
 // it depends on.

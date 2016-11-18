@@ -27,12 +27,23 @@ type CacheCorpusOperation func() (signature string, decompressErr error)
 
 // CacheSampleOperation represents the operation of generating a cachable
 // sample of a corpus. The function should take a schema describing the sample
-// to generate, and runs BitFunnel's `filter` command, returning an error as
+// to generate, as well as a path to the manifest and directory path for
+// results, and run BitFunnel's `filter` command, returning an error as
 // appropriate.
 type CacheSampleOperation func(
 	sample *schema.Sample,
 	corpusManifestPath string,
 	outputPath string,
+) error
+
+// ConfigCacheOperation represents the operation of generating a cachable
+// BitFunnel runtime configuration. The function should take a directory path
+// that configuration information can be dropped into, as well as a manifest
+// path for data on which to run the configuration commands. An error should be
+// returned as appropriate.
+type ConfigCacheOperation func(
+	configRoot string,
+	statsManifestPath string,
 ) error
 
 // Manager manages the lifecycle of the experiment files. This includes
@@ -47,6 +58,8 @@ type Manager interface {
 	InitSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error
 	UpdateSampleCache(samples []*schema.Sample, createSample CacheSampleOperation) error
 	VerifySampleCache() error
+
+	InitConfigCache(sampleName string, configure ConfigCacheOperation) error
 
 	WriteConfigManifestFile(absoluteCorpusPaths []string) error
 	// TODO: Move the "fetch" part of this out of `file.Manager`. This should
@@ -103,12 +116,12 @@ type managerContext struct {
 // this is an initialization procedure, we do not acquire the lock file, hence,
 // we are not protected against multiple processes.
 func (m *managerContext) InitDecompressedCorpusCache(decompressCorpus CacheCorpusOperation) error {
-	lockPath := filepath.Join(m.experimentRoot, lockFileName)
 	corpusSignature, decompressErr := decompressCorpus()
 	if decompressErr != nil {
 		return decompressErr
 	}
 
+	lockPath := filepath.Join(m.experimentRoot, lockFileName)
 	corpusLock := lock.NewCorpusLockFile(lockPath, corpusSignature)
 
 	writeErr := m.writeLockFile(lockPath, corpusLock)
@@ -218,6 +231,56 @@ func (m *managerContext) InitSampleCache(
 		if writeErr != nil {
 			return writeErr
 		}
+	}
+
+	return nil
+}
+
+func (m *managerContext) InitConfigCache(sampleName string, configure ConfigCacheOperation) error {
+	// TODO: Consider erroring out if we haven't called the sample init
+	// routines.
+
+	samplePath, samplePathExists := m.GetSamplePath(sampleName)
+	sampleManifestPath, sampleManifestPathExists :=
+		m.GetSampleManifestPath(sampleName)
+	if !(samplePathExists && sampleManifestPathExists) {
+		return fmt.Errorf("Statistics configuration requires sample with "+
+			"name '%s', but a sample with that name was not found in "+
+			"experiment schema", sampleName)
+	}
+
+	sampleLock, lockAcqErr := m.acquireLockFile(samplePath)
+	if lockAcqErr != nil {
+		return lockAcqErr
+	}
+	defer m.releaseLockFile(samplePath, sampleLock)
+
+	configureErr := configure(
+		m.configRoot,
+		sampleManifestPath)
+	if configureErr != nil {
+		return configureErr
+	}
+
+	sampleFiles, matchErr := m.getConfigPaths()
+	if matchErr != nil {
+		return matchErr
+	}
+
+	configSignature, signatureError := m.createSignature(sampleFiles)
+	if signatureError != nil {
+		return signatureError
+	}
+
+	configLockPath := filepath.Join(m.configRoot, lockFileName)
+	configLock := lock.NewConfigLockFile(
+		configLockPath,
+		configSignature,
+		sampleLock.Signature())
+
+	writeErr := m.writeLockFile(configLockPath, configLock)
+	if writeErr != nil {
+		return writeErr
 	}
 
 	return nil
@@ -624,6 +687,46 @@ func (m *managerContext) writeQueriesToScript(w *os.File, queryLog []string, ver
 //
 // PRIVATE FUNCTIONS.
 //
+
+func (m *managerContext) getConfigPaths() ([]string, error) {
+	termCountPaths, _ := filepath.Glob(
+		filepath.Join(
+			m.configRoot,
+			"CumulativeTermCounts-*.csv"))
+	freqTablePaths, _ := filepath.Glob(
+		filepath.Join(
+			m.configRoot,
+			"DocFreqTable-*.csv"))
+	indexedIdfTablePaths, _ := filepath.Glob(
+		filepath.Join(
+			m.configRoot,
+			"IndexedIdfTable-*.bin"))
+	termTablePaths, _ := filepath.Glob(
+		filepath.Join(
+			m.configRoot,
+			"TermTable-*.bin"))
+	docLengthHistPaths, _ := filepath.Glob(
+		filepath.Join(
+			m.configRoot,
+			"DocumentLengthHistogram.csv"))
+	termToTextPaths, _ := filepath.Glob(
+		filepath.Join(
+			m.configRoot,
+			"TermToText.bin"))
+
+	if len(termCountPaths) <= 0 || len(freqTablePaths) <= 0 || len(indexedIdfTablePaths) <= 0 || len(termTablePaths) <= 0 || len(docLengthHistPaths) <= 0 || len(termToTextPaths) <= 0 {
+		return nil, fmt.Errorf("Configuration directory '%s' must contain at least one of each of the following files: cumulative term counts, document frequency table, indexed IDF table, term table, document length histogram, and term table text mapping", m.configRoot)
+	}
+
+	allPaths := []string{}
+	allPaths = append(allPaths, termCountPaths...)
+	allPaths = append(allPaths, freqTablePaths...)
+	allPaths = append(allPaths, indexedIdfTablePaths...)
+	allPaths = append(allPaths, termTablePaths...)
+	allPaths = append(allPaths, docLengthHistPaths...)
+	allPaths = append(allPaths, termToTextPaths...)
+	return allPaths, nil
+}
 
 // TODO: Make this an actual URL.
 func fetchFileLines(url string, validationSHA512 string) ([]string, error) {
